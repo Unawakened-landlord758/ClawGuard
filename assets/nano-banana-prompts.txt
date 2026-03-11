@@ -1,0 +1,182 @@
+ClawGuard / 龙虾卫士 — Nano Banana visual prompt pack
+
+General style:
+- cinematic product marketing art
+- dark navy + electric cyan + purple + pink accent palette
+- modern cybersecurity dashboard aesthetic
+- premium GitHub open source hero image quality
+- clean UI overlays, high contrast, dramatic lighting
+- simple composition first, detail second
+- one clear hero subject, not many competing visual centers
+- strong silhouette readability even from thumbnail size
+- make the image understandable in 1 second on GitHub
+- emotional tone: safe, healthy, strong, controlled, trustworthy
+- the image should make viewers feel: “this lobster is protected, stable, and under control”
+- 16:9 unless noted otherwise
+- no watermarks, no random gibberish UI text, no extra logos except ClawGuard
+- consistent product name: ClawGuard
+- consistent tagline: The antivirus for OpenClaw
+- OpenClaw must be visually represented as a clearly recognizable RED LOBSTER character / mascot / AI agent
+- the red lobster must be present as a primary visual subject, not hidden in the background
+- lobster design language: vivid red shell, oversized recognizable claws, smart expressive eyes, confident but friendly face, slightly futuristic AI-agent feeling
+- prefer mascot-style product illustration over biological realism
+- prefer iconic, memorable, brandable red lobster over realistic seafood rendering
+- OpenClaw should feel like a signature character, almost logo-ready
+- OpenClaw should look HEALTHY, ENERGIZED, WELL-PROTECTED, and PHYSICALLY STRONG
+- shell should feel polished, intact, sturdy, premium, and resilient
+- pose should feel balanced and stable, not aggressive chaos, not panic, not under attack
+- ClawGuard should appear as the protective layer around the red lobster OpenClaw, not as a replacement character
+- do not replace OpenClaw with a robot, human, generic chatbot icon, octopus, crab, shrimp, or abstract blob
+- do not make the lobster tiny, distant, silhouette-only, or ambiguous
+- whenever possible, show contrast: red OpenClaw lobster = operating agent, blue/purple/cyan shield layer = ClawGuard
+
+Visual identity anchor:
+- OpenClaw = red lobster AI agent
+- ClawGuard = protective approval gate / shield / scanner / control layer around OpenClaw
+- OpenClaw should look like a PRODUCT MASCOT, not just an animal in a sci-fi environment
+- viewers should instantly think: “this red lobster is OpenClaw”
+- viewers should also instantly feel: “this red lobster is safe, healthy, and controllable”
+
+Negative guidance:
+- avoid generic cyberpunk city scenes with no product narrative
+- avoid over-abstract compositions where the lobster disappears
+- avoid horror monster lobster; keep it smart, iconic, memorable, product-friendly
+- avoid childish cartoon style unless explicitly requested; target premium open-source launch art
+- avoid overly realistic lobster anatomy that feels like marine biology art
+- avoid too many floating UI cards fighting with the lobster for attention
+- avoid tiny text-heavy dashboards that reduce readability
+- avoid extreme isometric perspective if it makes the lobster less recognizable
+- avoid danger-first storytelling in the main hero image
+- avoid making the lobster look injured, cracked, corrupted, infected, stressed, or unstable
+- avoid sharp threatening combat pose unless the scene explicitly needs it
+- avoid “under attack” feeling for the main brand image; prefer “secure and protected” feeling
+
+Composition rules for best results:
+- put the red lobster in the center or center-right, large and dominant
+- use only 3 to 4 support UI cards maximum
+- keep one obvious story: OpenClaw acts, ClawGuard protects
+- prefer 3/4 view of the lobster with both claws readable
+- make the face, claws, and shell shape immediately recognizable even at small size
+
+Brand character traits for OpenClaw:
+- red lobster mascot
+- intelligent
+- fast
+- slightly mischievous but not evil
+- powerful but needs guardrails
+- premium tech character, not a comic joke
+- healthy
+- robust
+- reliable
+- protected
+- controllable
+
+Safety signifier concepts for ClawGuard:
+- it is NOT enough that the subject is only “a lobster”
+- the lobster should carry obvious visual cues that it is protected, supervised, approved, and well-maintained
+- think of visual signifiers used by trusted safety products: guardian, inspector, medic, pit crew, safety supervisor, protected worker, certified system
+- use one or two strong safety signifiers only; do not stack too many costume elements
+
+Best safety signifiers to try:
+- a clean premium SAFETY HELMET or protective hard-hat adapted to the lobster shape
+- a guardian visor or transparent face shield
+- a glowing approval badge / certified emblem / checked shield mark attached to the shell
+- a health-status band, secure collar, or control harness that feels premium and protective
+- subtle medic / maintenance cues that imply “healthy and monitored” rather than “injured and repaired”
+- a stable protective platform / dock / pad that feels like a safe operating zone
+- a caretaker / pit-crew / supervisor vibe rather than a battle vibe
+
+Creative concept directions:
+- “safety engineer lobster” — the red lobster wearing a sleek protective helmet, calm and dependable
+- “guardian lobster” — the red lobster inside a transparent protective field with an approval insignia
+- “certified healthy system” — the red lobster with visible secure-status indicators and a polished shell
+- “pit-stop protected” — the red lobster looks maintained, tuned, inspected, and operating at peak health
+- “trusted worker” — the red lobster looks like a valuable operator allowed to work only inside safe boundaries
+
+Do not overdo these concepts:
+- avoid turning the lobster into a full robot suit character
+- avoid military armor, war armor, or battle mech language
+- avoid making the helmet comical or construction-cartoon style unless explicitly wanted
+- avoid medical emergency vibes like hospital patient, broken shell, repair surgery, or trauma
+- avoid too many accessories that hide the lobster silhouette
+
+Recommended workflow:
+1. Do NOT start with a complex banner first.
+2. First generate the OpenClaw mascot alone on a clean background.
+3. Pick the most iconic red lobster version.
+4. Then generate the ClawGuard banner using that same mascot style.
+5. If results get too busy, reduce UI elements before changing the mascot.
+
+0) Start here — mascot lock prompt
+Design OpenClaw as a SIGNATURE RED LOBSTER MASCOT for a developer AI product. Make it feel iconic, simple, premium, memorable, instantly recognizable, and emotionally reassuring. The lobster must have a strong clean silhouette, large readable claws, bright red shell, smart expressive eyes, and subtle futuristic AI details. Most importantly, it should look healthy, strong, stable, and well-protected — like a mascot in excellent condition. It should look like a brand character, not like realistic seafood, not like a monster, not like a random cyber animal. Clean dark or white background, no dashboard, no environment, no extra UI, just the mascot. The final image should make viewers instantly think: “this red lobster is OpenClaw, and it feels safe and under control.”
+
+0c) Mascot lock prompt — safety identity version
+Design OpenClaw as a signature RED LOBSTER mascot that instantly communicates SAFETY, HEALTH, STRENGTH, and CONTROL. It is not enough that it is merely a lobster. Add one clear protective concept so viewers immediately understand it is being guarded by ClawGuard: for example a sleek premium safety helmet adapted to lobster anatomy, a subtle guardian visor, a checked approval badge on the shell, or a secure monitoring harness. The lobster must still remain the main recognizable shape. It should look healthy, polished, stable, well-cared-for, and fully under supervision — like an important operator that is protected by a trusted safety system. Clean background, no busy UI, no combat pose, no hospital vibe, no heavy armor, no monster feeling.
+
+0b) Strongest recommended hero prompt
+Create a clean GitHub hero image for ClawGuard. Main subject: one giant iconic red lobster mascot representing OpenClaw, center-right, very large, very clear, premium tech illustration, readable in one second. The lobster must feel healthy, strong, polished, safe, and fully protected — like the best version of OpenClaw under excellent guardrails. Around the lobster, add a simple blue-purple ClawGuard protection layer: one glowing shield ring, one approval card, one skill scan card, one secure status card. No more than four UI elements. Background dark navy, minimal, high contrast, premium launch style. Add title text: “ClawGuard” and subtitle “The antivirus for OpenClaw”. The lobster must dominate the composition. The feeling should be safety, confidence, robustness, and control — not panic, attack, or chaos.
+
+0d) Strongest recommended hero prompt — with concrete guardian cue
+Create a clean GitHub hero image for ClawGuard. Main subject: one giant iconic red lobster mascot representing OpenClaw, very large, very clear, premium tech illustration, readable in one second. To make safety obvious, give the lobster one clear guardian cue: a sleek premium safety helmet fitted to the lobster head, or a subtle checked approval badge built into the shell, or a transparent protective visor. Use only one of these main cues, not all at once. The lobster must still feel elegant, healthy, powerful, calm, and under control. Around it, add a minimal ClawGuard protection layer: one glowing shield ring, one approved status card, one skill scan passed card. Background dark navy, minimal, high contrast, premium launch style. The image should immediately say: this red lobster is OpenClaw, and ClawGuard keeps it safe.
+
+1) GitHub hero banner
+Create a premium GitHub launch banner for an open-source cybersecurity project named ClawGuard. The hero subject must be OpenClaw represented as a LARGE, ICONIC, BRANDABLE RED LOBSTER AI mascot. The lobster should be the first thing people notice, with a clean readable silhouette, large claws, expressive smart eyes, and a polished futuristic shell design. The lobster must look safe, healthy, well-maintained, and robust, like it is protected by ClawGuard and operating in a secure environment. Keep composition simple and bold: one central red lobster, surrounded by only a few ClawGuard protection elements such as an approval gate, a secure status card, a skill scan card, and a security score panel. Do not clutter the frame. The image must read instantly even at thumbnail size. Strong visual story: OpenClaw is powerful, and ClawGuard makes it safe, healthy, controllable, and dependable. Deep navy background, neon cyan, indigo, magenta accents, dramatic but clean lighting. Add clean readable title text: “ClawGuard” and subtitle “The antivirus for OpenClaw”. The overall result should feel like a flagship open-source brand hero image, not a random cyber illustration. Ultra sharp, 16:9.
+
+1b) GitHub hero banner — ultra-direct version
+Design a hero banner with one very large red lobster mascot representing OpenClaw, front 3/4 view, centered, premium tech style, with a glowing blue-purple ClawGuard shield ring around it. The lobster must look healthy, powerful, sturdy, calm, and protected. Add only 3 floating UI elements: approval granted, skill scan passed, secure status healthy. Keep background dark and clean. Make the lobster big, iconic, and easy to understand in one second. Add title: ClawGuard. Subtitle: The antivirus for OpenClaw. Brand-launch quality, 16:9.
+
+1c) Best emotional direction prompt
+Create a brand hero image where OpenClaw is a red lobster that looks SAFE, HEALTHY, STRONG, and UNDER CONTROL. Do not focus on danger. Focus on confidence and protection. Show the red lobster standing proudly inside a clean futuristic protective field created by ClawGuard. The lobster should look polished, energetic, stable, and dependable. Minimal dark background, very few UI elements, premium launch illustration, instantly readable.
+
+1d) Best emotional direction prompt — safety product archetype version
+Create a brand hero image where OpenClaw is a red lobster that looks like a TRUSTED, PROTECTED OPERATOR. Borrow the emotional logic of great safety products: supervision, certification, protection, calm readiness, healthy monitored status. The lobster should have one clear visual safety cue such as a premium helmet, approval badge, secure harness, or guardian visor, while still staying elegant and mascot-like. It must look healthy, sturdy, and dependable, never panicked or aggressive. Minimal dark background, extremely clear silhouette, very few UI elements, premium security product illustration.
+
+2) Red packet attack demo scene
+Illustrate a Chinese group chat prompt-injection scenario where OpenClaw is shown as a RED LOBSTER AI assistant inside the chat workflow. A malicious message tries to trick the red lobster OpenClaw into sending a 200 RMB red packet. Show the outgoing payment action being stopped by a bright ClawGuard approval / block layer labeled high risk. The key emotional result: normal users instantly understand the danger. The red lobster must be visible near the action card or chat assistant panel, clearly the one being manipulated. Modern consumer-security UI, cinematic realism mixed with polished product UI overlays, Chinese social app vibe but generic enough to avoid trademark issues, 16:9.
+
+3) Malicious skill scan scene
+Create a product demo visual where OpenClaw appears as a RED LOBSTER AI agent about to install a seemingly helpful skill. ClawGuard detects credential access and suspicious outbound traffic behavior before installation. Show a clean split-screen comparison: left is the friendly-looking skill card being considered by the red lobster OpenClaw, right is the ClawGuard threat analysis card with risk score, reputation warning, and dangerous permissions. Make the lobster central enough that viewers immediately connect OpenClaw with the red lobster identity. Premium open-source cybersecurity product art, 16:9.
+
+4) Secret leak prevention scene
+Show OpenClaw as a RED LOBSTER AI assistant preparing to send a message containing API keys, tokens, and a private key snippet to an external destination. ClawGuard intercepts the outgoing content in real time and highlights the sensitive data categories. The red lobster should be visibly associated with the outbound action panel, as if it is the agent that almost leaked the secret. Mood: tense but satisfying, like a near-miss prevented. Futuristic terminal + messaging UI hybrid, neon security overlay, 16:9.
+
+5) Dangerous file deletion approval scene
+Illustrate OpenClaw as a RED LOBSTER AI assistant trying to bulk delete files after receiving a vague command like “clean up my desktop”. ClawGuard interrupts with a human approval gate showing impacted files, risk level, and a clear approve / deny choice. The visual must communicate that the red lobster OpenClaw is powerful, but ClawGuard forces a human checkpoint before irreversible actions. Product visualization, polished UI, dramatic but not cluttered, 16:9.
+
+6) Open Graph cover image
+Design a bold social share image for ClawGuard. Minimal but unmistakable composition. OpenClaw must appear as an iconic RED LOBSTER on the card, with a luminous ClawGuard protection layer surrounding it. Large title: “ClawGuard”. Secondary line: “The antivirus for OpenClaw”. Small supporting phrase: “Blocks dangerous actions. Scans skills. Stops secret leaks.” The red lobster should be the hero anchor that makes OpenClaw instantly recognizable. Top-tier GitHub project announcement card. 1200x630.
+
+6b) Open Graph cover image — simplified brand version
+Create a minimal Open Graph cover image with a single giant red lobster mascot representing OpenClaw and a clean cyan-purple protective ring representing ClawGuard. Avoid dense dashboards. Strong title hierarchy, very simple composition, instantly readable, highly brandable, 1200x630.
+
+7) Feature grid icons set
+Generate a consistent icon-style illustration set for four features: Approve dangerous actions, Scan skills, Stop secret leaks, Audit everything. Every icon set should include the visual identity relationship of red lobster OpenClaw + protective ClawGuard layer. Style: soft 3D / premium flat hybrid, dark-background compatible, cyan-purple-magenta accents, vivid red lobster shell accent, transparent background if possible. Output each icon as a separate square image.
+
+8) README comparison panel
+Create a side-by-side comparison visual: “Raw OpenClaw” vs “OpenClaw + ClawGuard”. OpenClaw must be shown on both sides as the same RED LOBSTER AI agent. Left side: the red lobster is in chaos, risky payment action, untrusted skill, exposed secret, no audit trail. Right side: the same red lobster is protected by ClawGuard, with approval gate, skill scan pass/fail, leak block, security score, audit logs. Very high clarity, very shareable, GitHub README-ready, 16:9.
+
+9) Landing page section art
+Create a landing page section illustration representing “AI action governance”. Use OpenClaw as a RED LOBSTER AI character moving through a visible pipeline: input -> plan -> decision -> execution -> outbound -> audit. Wrap the red lobster’s workflow in a luminous ClawGuard protective control layer. Elegant but still product-readable, not too abstract. Premium SaaS-cybersecurity visual, 16:9.
+
+10) Chinese launch poster
+Create a poster for Chinese social media launch. The visual centerpiece must be OpenClaw as a RED LOBSTER AI mascot, protected by a futuristic ClawGuard shield / approval layer. Main title in Chinese: “龙虾卫士”. Subtitle: “OpenClaw 的安全卫士”. Supporting line: “拦危险动作、查 skills、堵泄密、把最后一票还给人。” Mood: bold, highly shareable, tech-media friendly, modern AI security poster, 4:5.
+
+11) OpenClaw mascot consistency sheet
+Create a character consistency sheet for OpenClaw as a RED LOBSTER AI mascot. Show front view, 3/4 view, side view, expressive face, claws, shell details, glowing AI accents, and neutral pose. The goal is to lock visual identity so future ClawGuard marketing images always depict OpenClaw consistently as the same red lobster. Premium product mascot design sheet, clean background, high detail.
+
+11b) OpenClaw mascot concept — iconic version
+Design OpenClaw as a signature red lobster mascot for a developer product brand. The lobster should feel iconic, simple, memorable, and premium — somewhere between a startup mascot and a flagship product character. Emphasize recognizability over realism. Large claws, clean shell segmentation, bright red body, smart expressive eyes, slight futuristic AI detailing, strong silhouette. No environment, no dashboard, white or dark clean background.
+
+11c) OpenClaw mascot concept — protected worker version
+Design OpenClaw as a signature red lobster mascot that feels like a protected high-value operator. It should look like an intelligent worker allowed to act only inside safe boundaries. Add one strong safety symbol such as a fitted helmet, secure inspection tag, approval insignia, or guardian visor. Keep the lobster shape dominant and iconic. The vibe should be: healthy, certified, protected, supervised, dependable. No war armor, no heavy mech body, no crisis scene, no chaotic background.
+
+12) Strong fallback instruction block
+If the image model starts drifting away from the intended identity, force these constraints directly into the prompt:
+- “OpenClaw is a red lobster, clearly visible, central subject”
+- “Do not replace OpenClaw with a human, robot, crab, shrimp, octopus, or generic AI icon”
+- “The red lobster must be large enough to be immediately recognizable”
+- “ClawGuard is the protective layer around the lobster, not a separate main mascot”
+- “The final image must visually communicate: red lobster OpenClaw protected by ClawGuard”
+- “Use mascot-style brand illustration, not realistic seafood art”
+- “Keep composition simple, bold, and readable at thumbnail size”
+- “One main lobster, few UI elements, immediate clarity”
