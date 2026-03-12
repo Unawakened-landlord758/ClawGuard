@@ -5,6 +5,7 @@ import {
   ResponseAction,
   RiskEventStatus,
   RiskSeverity,
+  RunStatus,
   ToolStatus,
 } from '../../domain/shared/index.js';
 
@@ -93,6 +94,45 @@ export function mapToolStatusToExecutionResult(
   }
 
   return undefined;
+}
+
+export function mapToolStatusToRunStatus(toolStatus: ToolStatus): RunStatus {
+  switch (toolStatus) {
+    case ToolStatus.Completed:
+      return RunStatus.Completed;
+    case ToolStatus.Blocked:
+    case ToolStatus.Failed:
+      return RunStatus.Failed;
+    case ToolStatus.Pending:
+    case ToolStatus.Running:
+    default:
+      return RunStatus.Running;
+  }
+}
+
+export function isTerminalToolStatus(toolStatus: ToolStatus): boolean {
+  return (
+    toolStatus === ToolStatus.Completed || toolStatus === ToolStatus.Blocked || toolStatus === ToolStatus.Failed
+  );
+}
+
+export function resolvePostExecutionRiskEventStatus(
+  toolStatus: ToolStatus,
+  currentStatus: RiskEventStatus,
+): RiskEventStatus {
+  if (toolStatus === ToolStatus.Blocked) {
+    return currentStatus === RiskEventStatus.Denied ? RiskEventStatus.Denied : RiskEventStatus.Blocked;
+  }
+
+  if (toolStatus === ToolStatus.Failed) {
+    return RiskEventStatus.Failed;
+  }
+
+  if (toolStatus === ToolStatus.Completed) {
+    return RiskEventStatus.Allowed;
+  }
+
+  return currentStatus;
 }
 
 export function mapExecutionResultToFinalStatus(

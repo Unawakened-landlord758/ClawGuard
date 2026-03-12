@@ -15,6 +15,15 @@
     "skipLibCheck": true,
     "moduleDetection": "force",
     "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "clawguard": [
+        "src/index.ts"
+      ],
+      "openclaw/plugin-sdk/core": [
+        "openclaw/src/plugin-sdk/core.ts"
+      ]
+    },
     "types": [
       "node",
       "vitest/globals"
@@ -22,6 +31,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "plugins/**/*.ts",
     "tests/**/*.ts",
     "vitest.config.ts"
   ]

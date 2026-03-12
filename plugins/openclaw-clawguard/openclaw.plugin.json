@@ -1,0 +1,44 @@
+{
+  "id": "clawguard",
+  "name": "ClawGuard",
+  "description": "Minimal ClawGuard approval spike for OpenClaw.",
+  "version": "0.0.0",
+  "uiHints": {
+    "approvalTtlSeconds": {
+      "label": "Approval TTL (seconds)",
+      "help": "How long an allow-once retry remains valid after approval."
+    },
+    "pendingActionLimit": {
+      "label": "Pending action capacity",
+      "help": "Maximum number of live pending actions to keep before evicting the oldest entry."
+    },
+    "allowOnceGrantLimit": {
+      "label": "Allow-once grant capacity",
+      "help": "Maximum number of live allow-once grants to keep before evicting the oldest entry."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "approvalTtlSeconds": {
+        "type": "integer",
+        "minimum": 30,
+        "maximum": 3600,
+        "default": 900
+      },
+      "pendingActionLimit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 512,
+        "default": 64
+      },
+      "allowOnceGrantLimit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 512,
+        "default": 64
+      }
+    }
+  }
+}

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isTerminalToolStatus,
   mapExecutionResultToFinalStatus,
+  mapToolStatusToRunStatus,
   mapToolStatusToExecutionResult,
+  resolvePostExecutionRiskEventStatus,
   resolveRiskEventStatus,
   selectPrimaryRuleMatch,
 } from '../../src/orchestration/classifier/evaluation-outcomes.js';
@@ -14,6 +17,7 @@ import {
   RiskDomain,
   RiskEventStatus,
   RiskSeverity,
+  RunStatus,
   ToolStatus,
 } from '../../src/index.js';
 
@@ -93,5 +97,21 @@ describe('evaluation outcomes', () => {
     expect(mapExecutionResultToFinalStatus(undefined, ResponseAction.ApproveRequired)).toBe(
       AuditRecordFinalStatus.Logged,
     );
+  });
+
+  it('maps post-execution statuses without erasing a prior approval denial', () => {
+    expect(resolvePostExecutionRiskEventStatus(ToolStatus.Completed, RiskEventStatus.Approved)).toBe(RiskEventStatus.Allowed);
+    expect(resolvePostExecutionRiskEventStatus(ToolStatus.Failed, RiskEventStatus.Approved)).toBe(RiskEventStatus.Failed);
+    expect(resolvePostExecutionRiskEventStatus(ToolStatus.Blocked, RiskEventStatus.Denied)).toBe(RiskEventStatus.Denied);
+    expect(resolvePostExecutionRiskEventStatus(ToolStatus.Blocked, RiskEventStatus.Approved)).toBe(RiskEventStatus.Blocked);
+  });
+
+  it('maps terminal tool statuses onto run lifecycle semantics', () => {
+    expect(mapToolStatusToRunStatus(ToolStatus.Pending)).toBe(RunStatus.Running);
+    expect(mapToolStatusToRunStatus(ToolStatus.Completed)).toBe(RunStatus.Completed);
+    expect(mapToolStatusToRunStatus(ToolStatus.Failed)).toBe(RunStatus.Failed);
+    expect(mapToolStatusToRunStatus(ToolStatus.Blocked)).toBe(RunStatus.Failed);
+    expect(isTerminalToolStatus(ToolStatus.Running)).toBe(false);
+    expect(isTerminalToolStatus(ToolStatus.Completed)).toBe(true);
   });
 });
