@@ -194,6 +194,20 @@ It is to own the category:
 - [`README.zh-CN.md`](./README.zh-CN.md) — Simplified Chinese version
 - [`docs/system-architecture.md`](./docs/system-architecture.md) — overall platform architecture and long-term system design
 - [`docs/mvp-information-architecture.md`](./docs/mvp-information-architecture.md) — MVP product structure, flows, and demo baseline
+- [`docs/v1-dashboard-and-ux-blueprint.md`](./docs/v1-dashboard-and-ux-blueprint.md) — V1 dashboard and UX blueprint for safety, control, and reassurance
+- [`docs/v1-low-fidelity-prototype.md`](./docs/v1-low-fidelity-prototype.md) — low-fidelity prototype notes for page layout, cards, and demo flow
+- [`docs/v1-implementation-breakdown.md`](./docs/v1-implementation-breakdown.md) — V1 implementation slices, module boundaries, milestones, and acceptance criteria
+- [`docs/v1-epics-and-issues.md`](./docs/v1-epics-and-issues.md) — V1 epics, stories, technical debt, and dependency order for project planning
+- [`docs/v1-risk-evaluation-pipeline.md`](./docs/v1-risk-evaluation-pipeline.md) — V1 risk evaluation pipeline: fast-path rules, heuristic layers, and when models should escalate
+- [`docs/v1-fast-path-rules.md`](./docs/v1-fast-path-rules.md) — first-pass command, path, secret, and destination rules for Fast Path
+- [`docs/v1-rule-pack-design.md`](./docs/v1-rule-pack-design.md) — Rule Pack design for presets, local overrides, and future sharing/subscription
+- [`docs/v1-rule-pack-presets.md`](./docs/v1-rule-pack-presets.md) — first preset drafts for safe-default, developer-local, strict-lockdown, and observe-only
+- [`docs/v1-domain-model-and-storage.md`](./docs/v1-domain-model-and-storage.md) — core domain objects, relationships, and storage boundaries for V1
+- [`docs/v1-runtime-sequences.md`](./docs/v1-runtime-sequences.md) — runtime sequences and state transitions for exec, outbound, and workspace mutation
+- [`docs/v1-test-and-acceptance-plan.md`](./docs/v1-test-and-acceptance-plan.md) — V1 testing and acceptance plan for objects, chains, UX, and false-positive boundaries
+- [`docs/v1-north-star-demo-script.md`](./docs/v1-north-star-demo-script.md) — the north star demo script for “group-message money attack blocked”
+- [`docs/v1-development-readiness-checklist.md`](./docs/v1-development-readiness-checklist.md) — what still remains before coding starts, including backlog, skeleton, fixtures, and launch assets
+- [`docs/v1-initial-backlog.md`](./docs/v1-initial-backlog.md) — the initial Sprint 0 / Sprint 1 backlog draft for the first epics and stories
 - [`docs/security-methodology.md`](./docs/security-methodology.md) — full defense model
 - [`docs/market-research.md`](./docs/market-research.md) — market validation
 - [`docs/competitive-analysis.md`](./docs/competitive-analysis.md) — competitive positioning
