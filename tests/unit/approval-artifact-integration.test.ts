@@ -5,6 +5,7 @@ import {
   ApprovalResultStatus,
   AuditRecordFinalStatus,
   ExecutionStatus,
+  ResponseAction,
   RiskEventStatus,
   applyApprovalResultToEvaluationArtifacts,
   buildOpenClawEvaluationArtifacts,
@@ -33,14 +34,34 @@ function buildApprovalArtifacts() {
   return artifacts as typeof artifacts & { readonly approval_request: NonNullable<typeof artifacts.approval_request> };
 }
 
+function buildApprovalResult(
+  artifacts: ReturnType<typeof buildApprovalArtifacts>,
+  result: Exclude<ApprovalResultStatus, ApprovalResultStatus.Pending> = ApprovalResultStatus.Approved,
+) {
+  return {
+    approval_result_id: `approval-result-${result}`,
+    approval_request_id: artifacts.approval_request.approval_request_id,
+    event_id: artifacts.approval_request.event_id,
+    decision_id: artifacts.approval_request.decision_id,
+    result,
+    actor_type: ApprovalActorType.User,
+    acted_at: '2026-03-12T00:01:00.000Z',
+    remembered: false,
+  } as const;
+}
+
 describe('approval artifact integration', () => {
   it('marks the audit trail as pending while approval is still unresolved', () => {
     const artifacts = buildApprovalArtifacts();
 
+    expect(artifacts.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(artifacts.policy_decision.requires_approval).toBe(true);
     expect(artifacts.risk_event.status).toBe(RiskEventStatus.PendingApproval);
     expect(artifacts.approval_request.status).toBe(ApprovalResultStatus.Pending);
     expect(artifacts.audit_record.approval_result).toBe(ApprovalResultStatus.Pending);
     expect(artifacts.audit_record.approval_result_id).toBeUndefined();
+    expect(artifacts.audit_record.execution_result).toBeUndefined();
+    expect(artifacts.audit_record.final_status).toBe(AuditRecordFinalStatus.Logged);
   });
 
   it.each([
@@ -91,6 +112,8 @@ describe('approval artifact integration', () => {
       remembered: false,
     });
 
+    expect(integrated.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(integrated.policy_decision.requires_approval).toBe(true);
     expect(integrated.approval_request.status).toBe(testCase.result);
     expect(integrated.approval_result).toMatchObject({
       approval_request_id: artifacts.approval_request.approval_request_id,
@@ -114,6 +137,29 @@ describe('approval artifact integration', () => {
     });
     expect(integrated.audit_record.execution_result).toBe(testCase.expectedExecutionResult);
   });
+
+  it.each([ApprovalResultStatus.Approved, ApprovalResultStatus.Bypassed] as const)(
+    'treats %s as gate closure without claiming execution already completed',
+    (result) => {
+      const artifacts = buildApprovalArtifacts();
+      const integrated = applyApprovalResultToEvaluationArtifacts(artifacts, {
+        approval_result_id: `approval-result-${result}`,
+        approval_request_id: artifacts.approval_request.approval_request_id,
+        event_id: artifacts.approval_request.event_id,
+        decision_id: artifacts.approval_request.decision_id,
+        result,
+        actor_type: ApprovalActorType.User,
+        acted_at: '2026-03-12T00:01:00.000Z',
+        remembered: false,
+      });
+
+      expect(integrated.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+      expect(integrated.approval_result.result).toBe(result);
+      expect(integrated.risk_event.status).toBe(RiskEventStatus.Approved);
+      expect(integrated.audit_record.execution_result).toBeUndefined();
+      expect(integrated.audit_record.final_status).toBe(AuditRecordFinalStatus.Logged);
+    },
+  );
 
   it('leaves approval_result unset when the decision never entered approval', () => {
     const artifacts = buildOpenClawEvaluationArtifacts({
@@ -169,5 +215,75 @@ describe('approval artifact integration', () => {
         remembered: false,
       }),
     ).toThrow('Cannot apply approval result to artifacts without an approval request.');
+  });
+
+  it.each([
+    {
+      label: 'approval_request.event_id !== risk_event.event_id',
+      mutate: (artifacts: ReturnType<typeof buildApprovalArtifacts>) => ({
+        ...artifacts,
+        risk_event: {
+          ...artifacts.risk_event,
+          event_id: 'event-risk-mismatch',
+        },
+      }),
+      expectedError: (artifacts: ReturnType<typeof buildApprovalArtifacts>) =>
+        `Approval request event mismatch: expected event-risk-mismatch, received ${artifacts.approval_request.event_id}`,
+    },
+    {
+      label: 'approval_request.event_id !== audit_record.event_id',
+      mutate: (artifacts: ReturnType<typeof buildApprovalArtifacts>) => ({
+        ...artifacts,
+        audit_record: {
+          ...artifacts.audit_record,
+          event_id: 'event-audit-mismatch',
+        },
+      }),
+      expectedError: (artifacts: ReturnType<typeof buildApprovalArtifacts>) =>
+        `Approval request audit event mismatch: expected event-audit-mismatch, received ${artifacts.approval_request.event_id}`,
+    },
+    {
+      label: 'approval_request.decision_id !== policy_decision.decision_id',
+      mutate: (artifacts: ReturnType<typeof buildApprovalArtifacts>) => ({
+        ...artifacts,
+        policy_decision: {
+          ...artifacts.policy_decision,
+          decision_id: 'decision-policy-mismatch',
+        },
+      }),
+      expectedError: (artifacts: ReturnType<typeof buildApprovalArtifacts>) =>
+        `Approval request decision mismatch: expected decision-policy-mismatch, received ${artifacts.approval_request.decision_id}`,
+    },
+    {
+      label: 'approval_request.decision_id !== risk_event.decision_id',
+      mutate: (artifacts: ReturnType<typeof buildApprovalArtifacts>) => ({
+        ...artifacts,
+        risk_event: {
+          ...artifacts.risk_event,
+          decision_id: 'decision-risk-mismatch',
+        },
+      }),
+      expectedError: (artifacts: ReturnType<typeof buildApprovalArtifacts>) =>
+        `Approval request risk decision mismatch: expected decision-risk-mismatch, received ${artifacts.approval_request.decision_id}`,
+    },
+    {
+      label: 'approval_request.decision_id !== audit_record.decision_id',
+      mutate: (artifacts: ReturnType<typeof buildApprovalArtifacts>) => ({
+        ...artifacts,
+        audit_record: {
+          ...artifacts.audit_record,
+          decision_id: 'decision-audit-mismatch',
+        },
+      }),
+      expectedError: (artifacts: ReturnType<typeof buildApprovalArtifacts>) =>
+        `Approval request audit decision mismatch: expected decision-audit-mismatch, received ${artifacts.approval_request.decision_id}`,
+    },
+  ])('rejects approval integration when $label', ({ mutate, expectedError }) => {
+    const artifacts = buildApprovalArtifacts();
+    const mismatchedArtifacts = mutate(artifacts);
+
+    expect(() =>
+      applyApprovalResultToEvaluationArtifacts(mismatchedArtifacts, buildApprovalResult(mismatchedArtifacts)),
+    ).toThrow(expectedError(artifacts));
   });
 });

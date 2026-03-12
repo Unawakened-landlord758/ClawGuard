@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { selectPrimaryRuleMatch } from '../../src/orchestration/classifier/evaluation-outcomes.js';
+import {
+  mapExecutionResultToFinalStatus,
+  mapToolStatusToExecutionResult,
+  resolveRiskEventStatus,
+  selectPrimaryRuleMatch,
+} from '../../src/orchestration/classifier/evaluation-outcomes.js';
 import { matchCommandRules } from '../../src/orchestration/classifier/command-rules.js';
 import type { FastPathRuleMatch } from '../../src/orchestration/classifier/rule-match.js';
-import { ResponseAction, RiskDomain, RiskSeverity } from '../../src/index.js';
+import {
+  AuditRecordFinalStatus,
+  ResponseAction,
+  RiskDomain,
+  RiskEventStatus,
+  RiskSeverity,
+  ToolStatus,
+} from '../../src/index.js';
 
 function createRuleMatch(overrides: Partial<FastPathRuleMatch> = {}): FastPathRuleMatch {
   return {
@@ -73,5 +85,13 @@ describe('evaluation outcomes', () => {
       expect.arrayContaining(['exec.privilege.escalation', 'exec.system.configuration']),
     );
     expect(selectPrimaryRuleMatch(matches)?.rule_id).toBe('exec.privilege.escalation');
+  });
+
+  it('keeps approval-required decisions pending until a final approval result closes the gate', () => {
+    expect(resolveRiskEventStatus(ResponseAction.ApproveRequired, ToolStatus.Pending)).toBe(RiskEventStatus.PendingApproval);
+    expect(mapToolStatusToExecutionResult(ToolStatus.Pending, ResponseAction.ApproveRequired)).toBeUndefined();
+    expect(mapExecutionResultToFinalStatus(undefined, ResponseAction.ApproveRequired)).toBe(
+      AuditRecordFinalStatus.Logged,
+    );
   });
 });

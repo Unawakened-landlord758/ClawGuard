@@ -30,6 +30,8 @@ export function applyApprovalResultToEvaluationArtifacts(
     ...artifacts,
     approval_request: closure.approval_request,
     approval_result: linkedApprovalResult,
+    // policy_decision stays as the original gate intent, approval_result closes that gate,
+    // and execution_result only changes here when approval closure itself enforced a block.
     risk_event: applyApprovalClosureToRiskEvent(artifacts.risk_event, closure.risk_event_status),
     audit_record: applyApprovalClosureToAuditRecord(
       artifacts.audit_record,
