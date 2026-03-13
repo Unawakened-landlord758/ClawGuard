@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
+import { createAfterToolCallHandler } from './hooks/after-tool.js';
 import { createBeforeToolCallHandler } from './hooks/before-tool.js';
 import { createApprovalsRoute } from './routes/approvals.js';
 import { createAuditRoute } from './routes/audit.js';
@@ -47,6 +48,7 @@ const plugin = {
     });
 
     api.on('before_tool_call', createBeforeToolCallHandler(state));
+    api.on('after_tool_call', createAfterToolCallHandler(state));
     api.registerHttpRoute({
       path: '/plugins/clawguard/approvals',
       auth: 'gateway',

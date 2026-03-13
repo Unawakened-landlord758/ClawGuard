@@ -52,6 +52,7 @@ export type AuditEntryKind =
   | 'expired'
   | 'evicted'
   | 'allowed'
+  | 'failed'
   | 'blocked'
   | 'invalid_transition'
   | 'recovery_error'
@@ -62,6 +63,8 @@ export interface AuditEntry {
   readonly kind: AuditEntryKind;
   readonly timestamp: string;
   readonly session_key?: string;
+  readonly run_id?: string;
+  readonly tool_call_id?: string;
   readonly tool_name?: string;
   readonly pending_action_id?: string;
   readonly action_fingerprint?: string;

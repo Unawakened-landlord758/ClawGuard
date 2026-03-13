@@ -10,6 +10,8 @@ export class AuditLog {
     readonly kind: AuditEntryKind;
     readonly detail: string;
     readonly session_key?: string;
+    readonly run_id?: string;
+    readonly tool_call_id?: string;
     readonly tool_name?: string;
     readonly pending_action_id?: string;
     readonly action_fingerprint?: string;
@@ -19,6 +21,8 @@ export class AuditLog {
       kind: input.kind,
       detail: input.detail,
       session_key: input.session_key,
+      run_id: input.run_id,
+      tool_call_id: input.tool_call_id,
       tool_name: input.tool_name,
       pending_action_id: input.pending_action_id,
       action_fingerprint: input.action_fingerprint,

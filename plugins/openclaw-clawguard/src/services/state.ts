@@ -1,7 +1,16 @@
-import { ResponseAction, buildOpenClawEvaluationArtifacts } from 'clawguard';
+import {
+  ApprovalActorType,
+  ResponseAction,
+  ToolStatus,
+  applyApprovalResultToEvaluationArtifacts,
+  applyPostExecutionResultToEvaluationArtifacts,
+  buildOpenClawEvaluationArtifacts,
+  type ApprovalIntegratedArtifacts,
+  type EvaluationArtifacts,
+} from 'clawguard';
 import type { Clock, HookDecision, PendingAction } from '../types.js';
 import { AuditLog } from './audit.js';
-import { fingerprintAction } from '../utils.js';
+import { createId, fingerprintAction, toIsoString } from '../utils.js';
 import { DEFAULT_LIMITS, normalizeLimit, type ClawGuardLimits } from './limits.js';
 import {
   StateRepository,
@@ -25,62 +34,21 @@ export interface ToolContextSnapshot {
   readonly agentId?: string;
 }
 
+export interface ToolResultSnapshot extends ToolContextSnapshot {
+  readonly result?: unknown;
+  readonly error?: string;
+  readonly durationMs?: number;
+}
+
+interface TrackedToolExecution {
+  readonly pending_action_id?: string;
+  readonly action_fingerprint: string;
+  readonly artifacts: EvaluationArtifacts | ApprovalIntegratedArtifacts;
+}
+
 const defaultClock: Clock = {
   now: () => new Date(),
 };
-
-interface CoreExecHotPathDecision {
-  readonly decision: ResponseAction;
-  readonly reason_summary: string;
-  readonly reason_code: string;
-  readonly risk_level: string;
-  readonly impact_scope?: string;
-  readonly guidance_summary: string;
-}
-
-function evaluateExecHotPath(input: ToolContextSnapshot): CoreExecHotPathDecision | null {
-  const toolName = normalizeToolName(input.toolName);
-  if (toolName !== 'exec') {
-    return null;
-  }
-
-  const artifacts = buildOpenClawEvaluationArtifacts({
-    before_tool_call: {
-      event: {
-        toolName,
-        params: input.params,
-        runId: input.runId,
-        toolCallId: input.toolCallId,
-      },
-      context: {
-        sessionKey: input.sessionKey,
-        sessionId: input.sessionId,
-        agentId: input.agentId,
-        runId: input.runId,
-        toolCallId: input.toolCallId,
-      },
-    },
-    session_policy: {
-      sessionKey: input.sessionKey,
-      sessionId: input.sessionId,
-      agentId: input.agentId,
-    },
-  });
-
-  const command =
-    typeof artifacts.evaluation_input.tool_params.command === 'string'
-      ? artifacts.evaluation_input.tool_params.command.trim()
-      : undefined;
-
-  return {
-    decision: artifacts.policy_decision.decision,
-    reason_summary: artifacts.approval_request?.reason_summary ?? artifacts.policy_decision.reason,
-    reason_code: artifacts.policy_decision.reason_code,
-    risk_level: artifacts.risk_event.severity,
-    impact_scope: artifacts.approval_request?.impact_scope ?? command,
-    guidance_summary: artifacts.risk_event.summary,
-  };
-}
 
 export class ClawGuardState {
   public readonly audit: AuditLog;
@@ -95,6 +63,8 @@ export class ClawGuardState {
   };
 
   private readonly repository: StateRepository;
+
+  private readonly trackedExecutions = new Map<string, TrackedToolExecution>();
 
   public constructor(
     public readonly config: ClawGuardPluginConfig,
@@ -122,42 +92,56 @@ export class ClawGuardState {
 
   public evaluateBeforeToolCall(input: ToolContextSnapshot): HookDecision {
     const toolName = normalizeToolName(input.toolName);
-    const evaluation = evaluateExecHotPath(input);
-    if (
-      !evaluation ||
-      (evaluation.decision !== ResponseAction.ApproveRequired &&
-        evaluation.decision !== ResponseAction.Block)
-    ) {
-      return { block: false };
-    }
-
-    const sessionKey = input.sessionKey ?? 'session-unknown';
-    const runId = input.runId ?? 'run-unknown';
     const actionFingerprint = fingerprintAction({
       toolName,
       params: input.params,
     });
+    const correlationKey = buildExecutionCorrelationKey(input, toolName, actionFingerprint);
+    const artifacts = buildGuardedEvaluationArtifacts(input, toolName);
+    if (!artifacts) {
+      this.trackedExecutions.delete(correlationKey);
+      return { block: false };
+    }
 
-    this.audit.record({
-      kind: 'risk_hit',
-      detail: evaluation.reason_summary,
-      session_key: sessionKey,
-      tool_name: toolName,
-      action_fingerprint: actionFingerprint,
-    });
+    const sessionKey = artifacts.session_ref.session_key;
+    const runId = artifacts.run_ref.run_id;
+    const toolCallId = artifacts.tool_call_ref.tool_call_id;
 
-    if (evaluation.decision === ResponseAction.Block) {
+    if (
+      artifacts.policy_decision.decision === ResponseAction.ApproveRequired ||
+      artifacts.policy_decision.decision === ResponseAction.Block
+    ) {
+      this.audit.record({
+        kind: 'risk_hit',
+        detail: buildRiskHitDetail(artifacts),
+        session_key: sessionKey,
+        run_id: runId,
+        tool_call_id: toolCallId,
+        tool_name: toolName,
+        action_fingerprint: actionFingerprint,
+      });
+    }
+
+    if (artifacts.policy_decision.decision === ResponseAction.Block) {
+      this.trackedExecutions.delete(correlationKey);
       this.audit.record({
         kind: 'blocked',
-        detail: 'Blocked a high-risk exec action based on the shared core policy decision.',
+        detail: buildBeforeBlockDetail(artifacts),
         session_key: sessionKey,
+        run_id: runId,
+        tool_call_id: toolCallId,
         tool_name: toolName,
         action_fingerprint: actionFingerprint,
       });
       return {
         block: true,
-        blockReason: this.buildImmediateBlockMessage(evaluation),
+        blockReason: this.buildImmediateBlockMessage(artifacts),
       };
+    }
+
+    if (artifacts.policy_decision.decision !== ResponseAction.ApproveRequired) {
+      this.trackExecution(correlationKey, actionFingerprint, artifacts);
+      return { block: false };
     }
 
     const grantResult = this.repository.consumeMatchingGrant({
@@ -166,22 +150,26 @@ export class ClawGuardState {
       action_fingerprint: actionFingerprint,
     });
     if (grantResult.ok) {
+      const approvalIntegrated = applyApprovalResultToEvaluationArtifacts(
+        artifacts,
+        createSyntheticApprovalResult(artifacts, grantResult),
+      );
       this.audit.record({
         kind: 'allow_once_consumed',
-        detail: `Consumed allow-once grant ${grantResult.grant.grant_id}.`,
+        detail: `Consumed allow-once grant ${grantResult.grant.grant_id} for ${toolName}.`,
         session_key: sessionKey,
+        run_id: runId,
+        tool_call_id: toolCallId,
         tool_name: toolName,
         pending_action_id: grantResult.grant.pending_action_id,
         action_fingerprint: actionFingerprint,
       });
-      this.audit.record({
-        kind: 'allowed',
-        detail: 'Allowed a retried high-risk action after approval.',
-        session_key: sessionKey,
-        tool_name: toolName,
-        pending_action_id: grantResult.grant.pending_action_id,
-        action_fingerprint: actionFingerprint,
-      });
+      this.trackExecution(
+        correlationKey,
+        actionFingerprint,
+        approvalIntegrated,
+        grantResult.grant.pending_action_id,
+      );
       return { block: false };
     }
 
@@ -191,41 +179,47 @@ export class ClawGuardState {
       action_fingerprint: actionFingerprint,
     });
     if (existing) {
+      this.trackedExecutions.delete(correlationKey);
       return {
         block: true,
-        blockReason: this.buildBlockedMessage(existing, evaluation),
+        blockReason: this.buildBlockedMessage(existing, artifacts),
       };
     }
 
     const pendingAction = this.repository.createPendingAction({
       session_key: sessionKey,
-      session_id: input.sessionId,
-      agent_id: input.agentId,
+      session_id: artifacts.session_ref.session_id,
+      agent_id: artifacts.session_ref.agent_id,
       run_id: runId,
-      tool_call_id: input.toolCallId,
+      tool_call_id: toolCallId,
       tool_name: toolName,
       params: input.params,
       action_fingerprint: actionFingerprint,
       decision: 'approve_required',
-      reason_summary: evaluation.reason_summary,
-      reason_code: evaluation.reason_code,
-      risk_level: evaluation.risk_level,
-      impact_scope: evaluation.impact_scope,
-      guidance_summary: evaluation.guidance_summary,
+      reason_summary: artifacts.approval_request?.reason_summary ?? artifacts.policy_decision.reason,
+      reason_code: artifacts.policy_decision.reason_code,
+      risk_level: artifacts.risk_event.severity,
+      impact_scope: buildImpactScope(artifacts),
+      guidance_summary: artifacts.risk_event.summary,
     });
 
+    this.trackedExecutions.delete(correlationKey);
     this.audit.record({
       kind: 'pending_action_created',
-      detail: `Created pending approval ${pendingAction.pending_action_id}.`,
+      detail: `Created pending approval ${pendingAction.pending_action_id} for ${toolName}. ${artifacts.policy_decision.reason}`,
       session_key: sessionKey,
+      run_id: runId,
+      tool_call_id: toolCallId,
       tool_name: toolName,
       pending_action_id: pendingAction.pending_action_id,
       action_fingerprint: actionFingerprint,
     });
     this.audit.record({
       kind: 'blocked',
-      detail: 'Blocked a high-risk action and redirected it to the approval queue.',
+      detail: buildPendingBlockDetail(artifacts, pendingAction.pending_action_id),
       session_key: sessionKey,
+      run_id: runId,
+      tool_call_id: toolCallId,
       tool_name: toolName,
       pending_action_id: pendingAction.pending_action_id,
       action_fingerprint: actionFingerprint,
@@ -233,8 +227,44 @@ export class ClawGuardState {
 
     return {
       block: true,
-      blockReason: this.buildBlockedMessage(pendingAction),
+      blockReason: this.buildBlockedMessage(pendingAction, artifacts),
     };
+  }
+
+  public finalizeAfterToolCall(input: ToolResultSnapshot): void {
+    const toolName = normalizeToolName(input.toolName);
+    const actionFingerprint = fingerprintAction({
+      toolName,
+      params: input.params,
+    });
+    const correlationKey = buildExecutionCorrelationKey(input, toolName, actionFingerprint);
+    const tracked = this.trackedExecutions.get(correlationKey);
+    if (!tracked) {
+      return;
+    }
+
+    this.trackedExecutions.delete(correlationKey);
+
+    const integrated = applyPostExecutionResultToEvaluationArtifacts(tracked.artifacts, {
+      tool_status: deriveAfterToolStatus(input),
+      timestamp: toIsoString(this.clock.now()),
+      summary: buildAfterSummary(input),
+    });
+    const finalKind = mapFinalStatusToAuditKind(integrated.audit_record.final_status);
+    if (!finalKind) {
+      return;
+    }
+
+    this.audit.record({
+      kind: finalKind,
+      detail: buildFinalOutcomeDetail(integrated),
+      session_key: integrated.session_ref.session_key,
+      run_id: integrated.run_ref.run_id,
+      tool_call_id: integrated.tool_call_ref.tool_call_id,
+      tool_name: integrated.tool_call_ref.tool_name,
+      pending_action_id: tracked.pending_action_id,
+      action_fingerprint: tracked.action_fingerprint,
+    });
   }
 
   public approvePendingAction(pendingActionId: string): PendingActionMutationResult {
@@ -250,6 +280,8 @@ export class ClawGuardState {
       kind: 'approved',
       detail: `Approved pending action ${result.pendingAction.pending_action_id}.`,
       session_key: result.pendingAction.session_key,
+      run_id: result.pendingAction.run_id,
+      tool_call_id: result.pendingAction.tool_call_id,
       tool_name: result.pendingAction.tool_name,
       pending_action_id: result.pendingAction.pending_action_id,
       action_fingerprint: result.pendingAction.action_fingerprint,
@@ -259,6 +291,8 @@ export class ClawGuardState {
         kind: 'allow_once_issued',
         detail: `Issued allow-once grant ${result.grant.grant_id}.`,
         session_key: result.grant.session_key,
+        run_id: result.pendingAction.run_id,
+        tool_call_id: result.pendingAction.tool_call_id,
         tool_name: result.grant.tool_name,
         pending_action_id: result.grant.pending_action_id,
         action_fingerprint: result.grant.action_fingerprint,
@@ -281,6 +315,8 @@ export class ClawGuardState {
       kind: 'denied',
       detail: `Denied pending action ${result.pendingAction.pending_action_id}.`,
       session_key: result.pendingAction.session_key,
+      run_id: result.pendingAction.run_id,
+      tool_call_id: result.pendingAction.tool_call_id,
       tool_name: result.pendingAction.tool_name,
       pending_action_id: result.pendingAction.pending_action_id,
       action_fingerprint: result.pendingAction.action_fingerprint,
@@ -289,16 +325,30 @@ export class ClawGuardState {
     return result;
   }
 
+  private trackExecution(
+    correlationKey: string,
+    actionFingerprint: string,
+    artifacts: EvaluationArtifacts | ApprovalIntegratedArtifacts,
+    pendingActionId?: string,
+  ): void {
+    this.trackedExecutions.set(correlationKey, {
+      pending_action_id: pendingActionId,
+      action_fingerprint: actionFingerprint,
+      artifacts,
+    });
+  }
+
   private buildBlockedMessage(
     pendingAction: PendingAction,
-    evaluation?: CoreExecHotPathDecision,
+    artifacts?: EvaluationArtifacts,
   ): string {
-    const reason = pendingAction.reason_summary || evaluation?.reason_summary;
-    const guidance = pendingAction.guidance_summary || evaluation?.guidance_summary;
-    const impactScope = pendingAction.impact_scope || evaluation?.impact_scope;
+    const reason =
+      pendingAction.reason_summary || artifacts?.approval_request?.reason_summary || artifacts?.policy_decision.reason;
+    const guidance = pendingAction.guidance_summary || artifacts?.risk_event.summary;
+    const impactScope = pendingAction.impact_scope || (artifacts ? buildImpactScope(artifacts) : undefined);
 
     return [
-      'ClawGuard paused this exec action and queued it for approval.',
+      'ClawGuard paused this action and queued it for approval.',
       reason ? `Reason: ${reason}` : undefined,
       guidance ? `Guidance: ${guidance}` : undefined,
       impactScope ? `Impact scope: ${impactScope}` : undefined,
@@ -310,12 +360,12 @@ export class ClawGuardState {
       .join('\n');
   }
 
-  private buildImmediateBlockMessage(evaluation: CoreExecHotPathDecision): string {
+  private buildImmediateBlockMessage(artifacts: EvaluationArtifacts): string {
     return [
-      'ClawGuard blocked this exec action.',
-      `Reason: ${evaluation.reason_summary}`,
-      `Guidance: ${evaluation.guidance_summary}`,
-      evaluation.impact_scope ? `Impact scope: ${evaluation.impact_scope}` : undefined,
+      'ClawGuard blocked this action.',
+      `Reason: ${artifacts.policy_decision.reason}`,
+      `Guidance: ${artifacts.risk_event.summary}`,
+      buildImpactScope(artifacts) ? `Impact scope: ${buildImpactScope(artifacts)}` : undefined,
     ]
       .filter((line): line is string => Boolean(line))
       .join('\n');
@@ -357,6 +407,166 @@ export function createClawGuardState(
     },
     clock,
   );
+}
+
+function buildGuardedEvaluationArtifacts(
+  input: ToolContextSnapshot,
+  toolName: string,
+): EvaluationArtifacts | undefined {
+  const artifacts = buildOpenClawEvaluationArtifacts({
+    before_tool_call: {
+      event: {
+        toolName,
+        params: input.params,
+        runId: input.runId,
+        toolCallId: input.toolCallId,
+      },
+      context: {
+        sessionKey: input.sessionKey,
+        sessionId: input.sessionId,
+        agentId: input.agentId,
+        runId: input.runId,
+        toolCallId: input.toolCallId,
+      },
+    },
+    session_policy: {
+      sessionKey: input.sessionKey,
+      sessionId: input.sessionId,
+      agentId: input.agentId,
+    },
+  });
+
+  return (
+    artifacts.routing.pipeline_kind === 'exec' ||
+    artifacts.routing.pipeline_kind === 'outbound' ||
+    artifacts.routing.pipeline_kind === 'workspace_mutation'
+  )
+    ? artifacts
+    : undefined;
+}
+
+function createSyntheticApprovalResult(
+  artifacts: EvaluationArtifacts,
+  grantResult: Extract<ReturnType<StateRepository['consumeMatchingGrant']>, { readonly ok: true }>,
+) {
+  return {
+    approval_result_id: createId('approval-result'),
+    approval_request_id: artifacts.approval_request!.approval_request_id,
+    event_id: artifacts.approval_request!.event_id,
+    decision_id: artifacts.approval_request!.decision_id,
+    result: 'approved' as const,
+    actor_type: ApprovalActorType.User,
+    acted_at:
+      grantResult.pendingAction?.approved_at ??
+      grantResult.grant.issued_at,
+    remembered: false,
+  };
+}
+
+function buildExecutionCorrelationKey(
+  input: ToolContextSnapshot,
+  toolName: string,
+  actionFingerprint: string,
+): string {
+  return [
+    input.sessionKey ?? 'session-unknown',
+    input.runId ?? 'run-unknown',
+    input.toolCallId ?? 'toolcall-unknown',
+    toolName,
+    actionFingerprint,
+  ].join('|');
+}
+
+function buildImpactScope(artifacts: EvaluationArtifacts): string | undefined {
+  return (
+    artifacts.approval_request?.impact_scope ??
+    artifacts.evaluation_input.destination?.target ??
+    artifacts.evaluation_input.workspace_context?.paths[0] ??
+    readCommand(artifacts.evaluation_input.tool_params)
+  );
+}
+
+function buildRiskHitDetail(artifacts: EvaluationArtifacts): string {
+  return `${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+}
+
+function buildBeforeBlockDetail(artifacts: EvaluationArtifacts): string {
+  return `Blocked before execution. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+}
+
+function buildPendingBlockDetail(
+  artifacts: EvaluationArtifacts,
+  pendingActionId: string,
+): string {
+  return `Blocked before execution and queued ${pendingActionId}. ${artifacts.policy_decision.reason}`.trim();
+}
+
+function deriveAfterToolStatus(input: ToolResultSnapshot): ToolStatus {
+  if (typeof input.error === 'string' && input.error.trim().length > 0) {
+    return ToolStatus.Failed;
+  }
+
+  if (isBlockedResult(input.result)) {
+    return ToolStatus.Blocked;
+  }
+
+  return ToolStatus.Completed;
+}
+
+function buildAfterSummary(input: ToolResultSnapshot): string {
+  if (typeof input.error === 'string' && input.error.trim().length > 0) {
+    return input.error.trim();
+  }
+
+  if (typeof input.result === 'string' && input.result.trim().length > 0) {
+    return input.result.trim();
+  }
+
+  if (isBlockedResult(input.result)) {
+    return 'tool reported a blocked outcome';
+  }
+
+  return 'tool completed';
+}
+
+function isBlockedResult(result: unknown): boolean {
+  if (!result || typeof result !== 'object') {
+    return false;
+  }
+
+  const blocked =
+    'blocked' in result && result.blocked === true
+      ? true
+      : 'status' in result && typeof result.status === 'string'
+        ? result.status.trim().toLowerCase() === 'blocked'
+        : false;
+
+  return blocked;
+}
+
+function mapFinalStatusToAuditKind(
+  finalStatus: 'allowed' | 'blocked' | 'constrained' | 'failed' | 'logged',
+): 'allowed' | 'blocked' | 'failed' | undefined {
+  switch (finalStatus) {
+    case 'allowed':
+      return 'allowed';
+    case 'blocked':
+      return 'blocked';
+    case 'failed':
+      return 'failed';
+    default:
+      return undefined;
+  }
+}
+
+function buildFinalOutcomeDetail(
+  artifacts: ReturnType<typeof applyPostExecutionResultToEvaluationArtifacts>,
+): string {
+  return `Final outcome ${artifacts.audit_record.final_status} after execution. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+}
+
+function readCommand(toolParams: Record<string, unknown>): string | undefined {
+  return typeof toolParams.command === 'string' ? toolParams.command.trim() : undefined;
 }
 
 function normalizeToolName(toolName: string): string {

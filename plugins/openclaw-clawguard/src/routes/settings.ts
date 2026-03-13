@@ -42,7 +42,7 @@ export function createSettingsRoute(state: ClawGuardState) {
     <p>Approval TTL: ${state.config.approvalTtlSeconds} seconds</p>
     <p>Pending action limit: ${state.config.pendingActionLimit}</p>
     <p>Allow-once grant limit: ${state.config.allowOnceGrantLimit}</p>
-    <p>This spike only protects risky <code>exec</code> commands and requires one manual retry after approval.</p>
+    <p>This spike currently covers risky <code>exec</code>, minimal outbound tool calls, and a minimum <code>workspace mutation</code> loop for <code>write</code> / <code>apply_patch</code>, then requires one manual retry after approval.</p>
   </body>
 </html>`);
     return true;

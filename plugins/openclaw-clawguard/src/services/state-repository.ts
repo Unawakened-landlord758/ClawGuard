@@ -51,7 +51,7 @@ export type PendingActionMutationResult =
     };
 
 export type ConsumeGrantResult =
-  | { readonly ok: true; readonly grant: AllowOnceGrant }
+  | { readonly ok: true; readonly grant: AllowOnceGrant; readonly pendingAction?: PendingAction }
   | { readonly ok: false; readonly reason: 'not_found' };
 
 interface SnapshotPayload {
@@ -188,7 +188,7 @@ export class StateRepository {
     const expiresAt = toIsoString(new Date(now.getTime() + this.options.approvalTtlSeconds * 1000));
     const updated: PendingAction = {
       ...existing,
-      status: nextState,
+      status: nextState as PendingAction['status'],
       approved_at: toIsoString(now),
       expires_at: expiresAt,
     };
@@ -243,7 +243,7 @@ export class StateRepository {
       ok: true,
       pendingAction: {
         ...clonePendingAction(existing),
-        status: nextState,
+        status: nextState as PendingAction['status'],
       },
     };
   }
@@ -277,6 +277,8 @@ export class StateRepository {
       return { ok: false, reason: 'not_found' };
     }
 
+    const pendingAction = this.pendingActions.get(grant.pending_action_id);
+
     const nextPendingState = getNextPendingActionState(pendingState, 'consume');
     if (!nextPendingState) {
       return { ok: false, reason: 'not_found' };
@@ -288,7 +290,11 @@ export class StateRepository {
     this.pendingActionStates.set(grant.pending_action_id, nextPendingState);
     this.persistSnapshot();
 
-    return { ok: true, grant: cloneGrant(grant) };
+    return {
+      ok: true,
+      grant: cloneGrant(grant),
+      pendingAction: pendingAction ? clonePendingAction(pendingAction) : undefined,
+    };
   }
 
   private refreshLiveState(): void {
@@ -319,6 +325,8 @@ export class StateRepository {
         kind: 'expired',
         detail: `Expired pending action ${entry.pending_action_id}.`,
         session_key: entry.session_key,
+        run_id: entry.run_id,
+        tool_call_id: entry.tool_call_id,
         tool_name: entry.tool_name,
         pending_action_id: entry.pending_action_id,
         action_fingerprint: entry.action_fingerprint,
@@ -372,6 +380,8 @@ export class StateRepository {
         kind: 'evicted',
         detail: `Evicted pending action ${oldest.pending_action_id} after reaching capacity.`,
         session_key: oldest.session_key,
+        run_id: oldest.run_id,
+        tool_call_id: oldest.tool_call_id,
         tool_name: oldest.tool_name,
         pending_action_id: oldest.pending_action_id,
         action_fingerprint: oldest.action_fingerprint,
@@ -405,6 +415,8 @@ export class StateRepository {
             kind: 'evicted',
             detail: `Evicted pending action ${oldest.pending_action_id} while evicting its live grant.`,
             session_key: pending.session_key,
+            run_id: pending.run_id,
+            tool_call_id: pending.tool_call_id,
             tool_name: pending.tool_name,
             pending_action_id: pending.pending_action_id,
             action_fingerprint: pending.action_fingerprint,
@@ -450,7 +462,9 @@ export class StateRepository {
     const kind =
       transition === 'revoke'
         ? 'allow_once_revoked'
-        : transition;
+        : transition === 'expire'
+          ? 'expired'
+          : 'evicted';
     const detailPrefix =
       transition === 'expire'
         ? 'Expired'
@@ -491,6 +505,8 @@ export class StateRepository {
             kind: 'expired',
             detail: `Dropped expired pending action ${entry.pending_action_id} during recovery.`,
             session_key: entry.session_key,
+            run_id: entry.run_id,
+            tool_call_id: entry.tool_call_id,
             tool_name: entry.tool_name,
             pending_action_id: entry.pending_action_id,
             action_fingerprint: entry.action_fingerprint,

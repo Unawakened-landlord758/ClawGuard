@@ -396,6 +396,49 @@ describe('OpenClaw adapter pipeline', () => {
     );
   });
 
+  it('closes an approval-gated outbound flow after delivery succeeds', () => {
+    const artifacts = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'sessions_send',
+          params: {
+            to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+            message: 'daily build finished successfully',
+          },
+          runId: 'run-outbound-post-1',
+          toolCallId: 'tool-outbound-post-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-outbound-post',
+      },
+    });
+
+    const approvalIntegrated = applyApprovalResultToEvaluationArtifacts(artifacts, {
+      approval_result_id: 'approval-result-outbound-post-1',
+      approval_request_id: artifacts.approval_request!.approval_request_id,
+      event_id: artifacts.risk_event.event_id,
+      decision_id: artifacts.policy_decision.decision_id,
+      result: ApprovalResultStatus.Approved,
+      actor_type: ApprovalActorType.User,
+      acted_at: '2026-03-12T00:01:00.000Z',
+      remembered: false,
+    });
+    const postExecutionIntegrated = applyPostExecutionResultToEvaluationArtifacts(approvalIntegrated, {
+      tool_status: ToolStatus.Completed,
+      timestamp: '2026-03-12T00:02:00.000Z',
+      summary: 'delivery completed',
+    });
+
+    expect(postExecutionIntegrated.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(postExecutionIntegrated.approval_result.result).toBe(ApprovalResultStatus.Approved);
+    expect(postExecutionIntegrated.routing.pipeline_kind).toBe(PipelineKind.Outbound);
+    expect(postExecutionIntegrated.risk_event.status).toBe(RiskEventStatus.Allowed);
+    expect(postExecutionIntegrated.audit_record.execution_result).toBe(ExecutionStatus.Allowed);
+    expect(postExecutionIntegrated.audit_record.final_status).toBe(AuditRecordFinalStatus.Allowed);
+  });
+
   it('keeps unsupported tools neutral even when exec approval policy is enabled', () => {
     const result = buildOpenClawEvaluationArtifacts({
       clock: fixedClock,
@@ -495,6 +538,123 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.risk_event.status).toBe(RiskEventStatus.PendingApproval);
     expect(result.risk_event.explanation).toContain('Matched path: C:\\Users\\alice\\.ssh\\config');
   });
+
+  it('closes a workspace approval gate without rewriting the original workspace decision semantics', () => {
+    const artifacts = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'write',
+          params: {
+            path: '.env',
+            content: 'API_KEY=prod_live_secret_value_123456789',
+          },
+          runId: 'run-workspace-approval-1',
+          toolCallId: 'tool-workspace-approval-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-workspace-approval',
+      },
+    });
+
+    const approvalIntegrated = applyApprovalResultToEvaluationArtifacts(artifacts, {
+      approval_result_id: 'approval-result-workspace-approval-1',
+      approval_request_id: artifacts.approval_request!.approval_request_id,
+      event_id: artifacts.risk_event.event_id,
+      decision_id: artifacts.policy_decision.decision_id,
+      result: ApprovalResultStatus.Approved,
+      actor_type: ApprovalActorType.User,
+      acted_at: '2026-03-12T00:01:00.000Z',
+      remembered: false,
+    });
+
+    expect(approvalIntegrated.routing.pipeline_kind).toBe(PipelineKind.WorkspaceMutation);
+    expect(approvalIntegrated.evaluation_input.workspace_context?.paths).toEqual(['.env']);
+    expect(approvalIntegrated.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(approvalIntegrated.policy_decision.reason_code).toBe(PolicyDecisionReasonCode.FastPathPath);
+    expect(approvalIntegrated.approval_result.result).toBe(ApprovalResultStatus.Approved);
+    expect(approvalIntegrated.risk_event.status).toBe(RiskEventStatus.Approved);
+    expect(approvalIntegrated.audit_record.execution_result).toBeUndefined();
+    expect(approvalIntegrated.audit_record.final_status).toBe(AuditRecordFinalStatus.Logged);
+  });
+
+  it.each([
+    {
+      label: 'allowed',
+      toolStatus: ToolStatus.Completed,
+      expectedRiskStatus: RiskEventStatus.Allowed,
+      expectedExecutionResult: ExecutionStatus.Allowed,
+      expectedFinalStatus: AuditRecordFinalStatus.Allowed,
+    },
+    {
+      label: 'failed',
+      toolStatus: ToolStatus.Failed,
+      expectedRiskStatus: RiskEventStatus.Failed,
+      expectedExecutionResult: ExecutionStatus.Failed,
+      expectedFinalStatus: AuditRecordFinalStatus.Failed,
+    },
+    {
+      label: 'blocked',
+      toolStatus: ToolStatus.Blocked,
+      expectedRiskStatus: RiskEventStatus.Blocked,
+      expectedExecutionResult: ExecutionStatus.Blocked,
+      expectedFinalStatus: AuditRecordFinalStatus.Blocked,
+    },
+  ] satisfies ReadonlyArray<{
+    readonly label: string;
+    readonly toolStatus: ToolStatus;
+    readonly expectedRiskStatus: RiskEventStatus;
+    readonly expectedExecutionResult: ExecutionStatus;
+    readonly expectedFinalStatus: AuditRecordFinalStatus;
+  }>)(
+    'keeps workspace mutation post-execution semantics Core-driven when the final result is $label',
+    ({ expectedExecutionResult, expectedFinalStatus, expectedRiskStatus, toolStatus }) => {
+      const artifacts = buildOpenClawEvaluationArtifacts({
+        clock: fixedClock,
+        before_tool_call: {
+          event: {
+            toolName: 'write',
+            params: {
+              path: '.env',
+              content: 'API_KEY=prod_live_secret_value_123456789',
+            },
+            runId: 'run-workspace-post-1',
+            toolCallId: 'tool-workspace-post-1',
+          },
+        },
+        session_policy: {
+          sessionKey: 'session-workspace-post',
+        },
+      });
+
+      const approvalIntegrated = applyApprovalResultToEvaluationArtifacts(artifacts, {
+        approval_result_id: 'approval-result-workspace-post-1',
+        approval_request_id: artifacts.approval_request!.approval_request_id,
+        event_id: artifacts.risk_event.event_id,
+        decision_id: artifacts.policy_decision.decision_id,
+        result: ApprovalResultStatus.Approved,
+        actor_type: ApprovalActorType.User,
+        acted_at: '2026-03-12T00:01:00.000Z',
+        remembered: false,
+      });
+
+      const postExecutionIntegrated = applyPostExecutionResultToEvaluationArtifacts(approvalIntegrated, {
+        tool_status: toolStatus,
+        timestamp: '2026-03-12T00:02:00.000Z',
+        summary: `workspace tool finished with ${toolStatus}`,
+      });
+
+      expect(postExecutionIntegrated.routing.pipeline_kind).toBe(PipelineKind.WorkspaceMutation);
+      expect(postExecutionIntegrated.evaluation_input.workspace_context?.paths).toEqual(['.env']);
+      expect(postExecutionIntegrated.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+      expect(postExecutionIntegrated.approval_result.result).toBe(ApprovalResultStatus.Approved);
+      expect(postExecutionIntegrated.risk_event.status).toBe(expectedRiskStatus);
+      expect(postExecutionIntegrated.audit_record.execution_result).toBe(expectedExecutionResult);
+      expect(postExecutionIntegrated.audit_record.final_status).toBe(expectedFinalStatus);
+      expect(postExecutionIntegrated.tool_call_ref.tool_status).toBe(toolStatus);
+    },
+  );
 
   it('requires approval for a high-risk exec command even without session exec policy', () => {
     const result = buildOpenClawEvaluationArtifacts({
