@@ -3,10 +3,15 @@ import path from 'node:path';
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/core';
 import { createAfterToolCallHandler } from './hooks/after-tool.js';
 import { createBeforeToolCallHandler } from './hooks/before-tool.js';
+import { createMessageSendingHandler } from './hooks/message-sending.js';
 import { createApprovalsRoute } from './routes/approvals.js';
 import { createAuditRoute } from './routes/audit.js';
 import { createSettingsRoute } from './routes/settings.js';
 import { createClawGuardState } from './services/state.js';
+
+const APPROVALS_ROUTE_PATH = '/plugins/clawguard/approvals';
+const AUDIT_ROUTE_PATH = '/plugins/clawguard/audit';
+const SETTINGS_ROUTE_PATH = '/plugins/clawguard/settings';
 
 function readApprovalTtlSeconds(pluginConfig: Record<string, unknown> | undefined): number {
   const raw = pluginConfig?.approvalTtlSeconds;
@@ -33,7 +38,7 @@ function readCapacityLimit(
 const plugin = {
   id: 'clawguard',
   name: 'ClawGuard',
-  description: 'Minimal ClawGuard approval spike for OpenClaw.',
+  description: 'Install-demo ClawGuard approval plugin for OpenClaw.',
   register(api: OpenClawPluginApi) {
     const state = createClawGuardState({
       approvalTtlSeconds: readApprovalTtlSeconds(api.pluginConfig),
@@ -49,26 +54,29 @@ const plugin = {
 
     api.on('before_tool_call', createBeforeToolCallHandler(state));
     api.on('after_tool_call', createAfterToolCallHandler(state));
+    // Host-level direct sends hit message_sending; tool-originated message/sessions_send
+    // stays on before_tool_call where approval/retry support already exists.
+    api.on('message_sending', createMessageSendingHandler(state));
     api.registerHttpRoute({
-      path: '/plugins/clawguard/approvals',
+      path: APPROVALS_ROUTE_PATH,
       auth: 'gateway',
       match: 'prefix',
       handler: createApprovalsRoute(state),
     });
     api.registerHttpRoute({
-      path: '/plugins/clawguard/audit',
+      path: AUDIT_ROUTE_PATH,
       auth: 'gateway',
       match: 'exact',
       handler: createAuditRoute(state),
     });
     api.registerHttpRoute({
-      path: '/plugins/clawguard/settings',
+      path: SETTINGS_ROUTE_PATH,
       auth: 'gateway',
       match: 'exact',
       handler: createSettingsRoute(state),
     });
 
-    api.logger.info('ClawGuard spike plugin loaded.');
+    api.logger.info(`ClawGuard demo plugin loaded. Visit ${SETTINGS_ROUTE_PATH} for settings and install-demo notes.`);
   },
 };
 

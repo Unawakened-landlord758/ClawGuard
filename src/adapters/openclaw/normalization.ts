@@ -149,7 +149,10 @@ function normalizeDestination(
   toolParams: Record<string, unknown>,
 ): EvaluationDestination | undefined {
   const normalizedToolName = normalizeToolName(toolName);
-  const isOutboundTool = normalizedToolName === 'message' || normalizedToolName === 'sessions_send';
+  const isOutboundTool =
+    normalizedToolName === 'message' ||
+    normalizedToolName === 'message_sending' ||
+    normalizedToolName === 'sessions_send';
   if (!isOutboundTool) {
     return undefined;
   }

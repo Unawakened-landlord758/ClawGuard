@@ -25,6 +25,11 @@ const SUPPORTED_TOOL_ROUTES = {
     risk_domain: RiskDomain.DataPrivacy,
     pipeline_kind: PipelineKind.Outbound,
   },
+  message_sending: {
+    event_type: RiskEventType.Outbound,
+    risk_domain: RiskDomain.DataPrivacy,
+    pipeline_kind: PipelineKind.Outbound,
+  },
   sessions_send: {
     event_type: RiskEventType.Outbound,
     risk_domain: RiskDomain.DataPrivacy,

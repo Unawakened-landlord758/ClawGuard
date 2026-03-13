@@ -42,6 +42,7 @@ export function buildApprovalActionTitle(evaluationInput: EvaluationInput): stri
     case 'exec':
       return 'Approve command execution';
     case 'message':
+    case 'message_sending':
     case 'sessions_send':
       return 'Approve outbound delivery';
     case 'write':

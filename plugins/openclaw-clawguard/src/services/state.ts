@@ -8,7 +8,13 @@ import {
   type ApprovalIntegratedArtifacts,
   type EvaluationArtifacts,
 } from 'clawguard';
-import type { Clock, HookDecision, PendingAction } from '../types.js';
+import type {
+  Clock,
+  HookDecision,
+  MessageSendingDecision,
+  MessageSendingSnapshot,
+  PendingAction,
+} from '../types.js';
 import { AuditLog } from './audit.js';
 import { createId, fingerprintAction, toIsoString } from '../utils.js';
 import { DEFAULT_LIMITS, normalizeLimit, type ClawGuardLimits } from './limits.js';
@@ -229,6 +235,41 @@ export class ClawGuardState {
       block: true,
       blockReason: this.buildBlockedMessage(pendingAction, artifacts),
     };
+  }
+
+  public evaluateMessageSending(input: MessageSendingSnapshot): MessageSendingDecision {
+    const toolName = normalizeToolName('message_sending');
+    const params = buildHostOutboundToolParams(input);
+    const actionFingerprint = fingerprintAction({
+      toolName,
+      params,
+    });
+    const artifacts = buildHostOutboundEvaluationArtifacts(input, params);
+
+    if (artifacts.policy_decision.decision !== ResponseAction.Block) {
+      return { cancel: false };
+    }
+
+    this.audit.record({
+      kind: 'risk_hit',
+      detail: buildRiskHitDetail(artifacts),
+      session_key: artifacts.session_ref.session_key,
+      run_id: artifacts.run_ref.run_id,
+      tool_call_id: artifacts.tool_call_ref.tool_call_id,
+      tool_name: toolName,
+      action_fingerprint: actionFingerprint,
+    });
+    this.audit.record({
+      kind: 'blocked',
+      detail: buildHostOutboundBlockDetail(artifacts),
+      session_key: artifacts.session_ref.session_key,
+      run_id: artifacts.run_ref.run_id,
+      tool_call_id: artifacts.tool_call_ref.tool_call_id,
+      tool_name: toolName,
+      action_fingerprint: actionFingerprint,
+    });
+
+    return { cancel: true };
   }
 
   public finalizeAfterToolCall(input: ToolResultSnapshot): void {
@@ -501,6 +542,10 @@ function buildPendingBlockDetail(
   return `Blocked before execution and queued ${pendingActionId}. ${artifacts.policy_decision.reason}`.trim();
 }
 
+function buildHostOutboundBlockDetail(artifacts: EvaluationArtifacts): string {
+  return `Blocked host outbound delivery before channel send. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+}
+
 function deriveAfterToolStatus(input: ToolResultSnapshot): ToolStatus {
   if (typeof input.error === 'string' && input.error.trim().length > 0) {
     return ToolStatus.Failed;
@@ -565,8 +610,80 @@ function buildFinalOutcomeDetail(
   return `Final outcome ${artifacts.audit_record.final_status} after execution. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
 }
 
+function buildHostOutboundEvaluationArtifacts(
+  input: MessageSendingSnapshot,
+  params: Record<string, unknown>,
+): EvaluationArtifacts {
+  const sessionKey = buildHostOutboundSessionKey(input);
+  const thread = readHostOutboundThread(input.metadata);
+  const runId = createId('host-outbound-run');
+  const toolCallId = createId('host-outbound-call');
+
+  return buildOpenClawEvaluationArtifacts({
+    before_tool_call: {
+      event: {
+        toolName: 'message_sending',
+        params,
+        runId,
+        toolCallId,
+      },
+      context: {
+        sessionKey,
+        runId,
+        toolCallId,
+      },
+    },
+    session_policy: {
+      sessionKey,
+      origin: {
+        channel: input.channelId,
+        to: input.conversationId ?? input.to,
+        ...(thread ? { thread } : {}),
+      },
+    },
+  });
+}
+
+function buildHostOutboundToolParams(input: MessageSendingSnapshot): Record<string, unknown> {
+  const thread = readHostOutboundThread(input.metadata);
+
+  return {
+    to: input.to,
+    message: input.content,
+    ...(thread ? { thread } : {}),
+  };
+}
+
+function buildHostOutboundSessionKey(input: MessageSendingSnapshot): string {
+  return [
+    'host-outbound',
+    normalizeSessionKeySegment(input.channelId),
+    normalizeSessionKeySegment(input.accountId ?? 'default'),
+    normalizeSessionKeySegment(input.conversationId ?? input.to),
+  ].join(':');
+}
+
+function readHostOutboundThread(metadata: Record<string, unknown> | undefined): string | undefined {
+  const value = metadata?.threadTs ?? metadata?.threadId ?? metadata?.thread;
+  if (typeof value === 'number') {
+    return String(value);
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
 function readCommand(toolParams: Record<string, unknown>): string | undefined {
   return typeof toolParams.command === 'string' ? toolParams.command.trim() : undefined;
+}
+
+function normalizeSessionKeySegment(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  return normalized.replace(/[^a-z0-9._-]+/g, '_');
 }
 
 function normalizeToolName(toolName: string): string {

@@ -8,7 +8,9 @@ import { ResponseAction, buildOpenClawEvaluationArtifacts } from 'clawguard';
 import plugin from '../../plugins/openclaw-clawguard/src/index.js';
 import { createAfterToolCallHandler } from '../../plugins/openclaw-clawguard/src/hooks/after-tool.js';
 import { createBeforeToolCallHandler } from '../../plugins/openclaw-clawguard/src/hooks/before-tool.js';
+import { createMessageSendingHandler } from '../../plugins/openclaw-clawguard/src/hooks/message-sending.js';
 import { createApprovalsRoute } from '../../plugins/openclaw-clawguard/src/routes/approvals.js';
+import { createSettingsRoute } from '../../plugins/openclaw-clawguard/src/routes/settings.js';
 import { createClawGuardState } from '../../plugins/openclaw-clawguard/src/services/state.js';
 import type { Clock } from '../../plugins/openclaw-clawguard/src/types.js';
 
@@ -174,6 +176,35 @@ function createWorkspacePatchEvent({
   };
 }
 
+function createHostOutboundMessageEvent({
+  to = 'C123',
+  content = 'all clear',
+  channelId = 'slack',
+  accountId = 'default',
+  conversationId = 'C123',
+  metadata,
+}: {
+  to?: string;
+  content?: string;
+  channelId?: string;
+  accountId?: string;
+  conversationId?: string;
+  metadata?: Record<string, unknown>;
+} = {}) {
+  return {
+    event: {
+      to,
+      content,
+      metadata,
+    },
+    context: {
+      channelId,
+      accountId,
+      conversationId,
+    },
+  };
+}
+
 function buildCoreExecArtifacts(
   event: ReturnType<typeof createRiskyExecEvent>['event'],
   context: ReturnType<typeof createRiskyExecEvent>['context'],
@@ -263,6 +294,57 @@ describe('OpenClaw ClawGuard plugin spike', () => {
       id: 'clawguard',
       name: 'ClawGuard',
     });
+  });
+
+  it('keeps package metadata and manifest aligned for the local install demo path', () => {
+    const pluginRoot = path.resolve('plugins', 'openclaw-clawguard');
+    const packageManifest = JSON.parse(readFileSync(path.join(pluginRoot, 'package.json'), 'utf8')) as {
+      name: string;
+      version: string;
+      description: string;
+      files: string[];
+      exports: Record<string, string>;
+      openclaw: {
+        extensions: string[];
+        install: {
+          npmSpec: string;
+          localPath: string;
+          defaultChoice: string;
+        };
+      };
+    };
+    const pluginManifest = JSON.parse(
+      readFileSync(path.join(pluginRoot, 'openclaw.plugin.json'), 'utf8'),
+    ) as {
+      id: string;
+      name: string;
+      version: string;
+      description: string;
+    };
+
+    expect(packageManifest.name).toBe('@clawguard/openclaw-clawguard');
+    expect(packageManifest.version).toBe('0.0.0-demo.0');
+    expect(packageManifest.description).toContain('Install-demo');
+    expect(packageManifest.files).toEqual(expect.arrayContaining(['src', 'openclaw.plugin.json']));
+    expect(packageManifest.exports).toMatchObject({
+      '.': './src/index.ts',
+      './manifest': './openclaw.plugin.json',
+    });
+    expect(packageManifest.openclaw).toMatchObject({
+      extensions: ['./src/index.ts'],
+      install: {
+        npmSpec: '@clawguard/openclaw-clawguard',
+        localPath: 'plugins/openclaw-clawguard',
+        defaultChoice: 'local',
+      },
+    });
+
+    expect(pluginManifest).toMatchObject({
+      id: 'clawguard',
+      name: 'ClawGuard',
+      version: packageManifest.version,
+    });
+    expect(pluginManifest.description).toContain('plugin-hosted settings, approvals, and audit pages');
   });
 
   it('uses stable package imports and avoids repo-root source hops or process execution APIs', () => {
@@ -684,6 +766,37 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(getAuditKinds(state)).toEqual(expect.arrayContaining(['allow_once_issued', 'allow_once_consumed']));
   });
 
+  it('cancels direct host outbound sends when message_sending hits a hard block rule', () => {
+    const state = createClawGuardState();
+    const handler = createMessageSendingHandler(state);
+    const { event, context } = createHostOutboundMessageEvent({
+      content: 'leaking sk-live-1234567890abcdef to Slack',
+      metadata: { threadTs: '1111.2222' },
+    });
+
+    const result = handler(event, context);
+
+    expect(result).toEqual({ cancel: true });
+    expect(state.pendingActions.list()).toHaveLength(0);
+    expect(getLatestAuditByKind(state, 'blocked')?.detail).toContain(
+      'Blocked host outbound delivery before channel send.',
+    );
+  });
+
+  it('does not queue approval-only host outbound matches on message_sending', () => {
+    const state = createClawGuardState();
+    const handler = createMessageSendingHandler(state);
+    const { event, context } = createHostOutboundMessageEvent({
+      content: 'Bearer abcdefghijklmnopqrstuvwxyz123456',
+    });
+
+    const result = handler(event, context);
+
+    expect(result).toBeUndefined();
+    expect(state.pendingActions.list()).toHaveLength(0);
+    expect(getAuditKinds(state)).not.toContain('pending_action_created');
+  });
+
   it('does not allow a retry when the fingerprint changes', () => {
     const state = createClawGuardState();
     const handler = createBeforeToolCallHandler(state);
@@ -881,6 +994,45 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(getAuditKinds(state)).toContain('expired');
   });
 
+  it('serves install-demo metadata from the settings route in both HTML and JSON modes', () => {
+    const state = createClawGuardState({ approvalTtlSeconds: 120 });
+    const route = createSettingsRoute(state);
+
+    const htmlResponse = createMockResponse();
+    route(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/settings',
+      } as never,
+      htmlResponse as never,
+    );
+    expect(htmlResponse.statusCode).toBe(200);
+    expect(htmlResponse.body).toContain('openclaw plugins install .\\plugins\\openclaw-clawguard');
+    expect(htmlResponse.body).toContain('not published');
+    expect(htmlResponse.body).toContain('docs/v1-installer-demo-strategy.md');
+
+    const jsonResponse = createMockResponse();
+    route(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/settings?format=json',
+      } as never,
+      jsonResponse as never,
+    );
+    expect(jsonResponse.statusCode).toBe(200);
+    expect(jsonResponse.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    expect(JSON.parse(jsonResponse.body)).toMatchObject({
+      approvalTtlSeconds: 120,
+      installDemo: {
+        published: false,
+        packageName: '@clawguard/openclaw-clawguard',
+        recommendedCommand: 'openclaw plugins install .\\plugins\\openclaw-clawguard',
+        optionalPackedArtifactHint: 'pnpm --dir plugins\\openclaw-clawguard pack',
+        docsPath: 'docs/v1-installer-demo-strategy.md',
+      },
+    });
+  });
+
   it('persists only live state and restores it from the OpenClaw-safe snapshot path', () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), 'clawguard-state-'));
     const snapshotFilePath = path.join(tempDir, 'plugins', 'clawguard', 'live-state.json');
@@ -1036,6 +1188,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 
      const loaded = registry.plugins.find((entry) => entry.id === 'clawguard');
      expect(loaded?.status).toBe('loaded');
+     expect(loaded?.hookNames).toContain('message_sending');
      expect(loaded?.hookNames).toContain('before_tool_call');
      expect(loaded?.hookNames).toContain('after_tool_call');
 

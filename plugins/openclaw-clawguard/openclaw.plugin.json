@@ -1,8 +1,8 @@
 {
   "id": "clawguard",
   "name": "ClawGuard",
-  "description": "Minimal ClawGuard approval spike for OpenClaw.",
-  "version": "0.0.0",
+  "description": "Install-demo ClawGuard approval gate for OpenClaw with plugin-hosted settings, approvals, and audit pages.",
+  "version": "0.0.0-demo.0",
   "uiHints": {
     "approvalTtlSeconds": {
       "label": "Approval TTL (seconds)",

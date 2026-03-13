@@ -1,9 +1,21 @@
 {
   "name": "@clawguard/openclaw-clawguard",
-  "version": "0.0.0",
+  "version": "0.0.0-demo.0",
   "type": "module",
   "main": "./src/index.ts",
-  "description": "Minimal ClawGuard spike plugin for OpenClaw.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./openclaw.plugin.json"
+  },
+  "description": "Install-demo ClawGuard approval plugin for OpenClaw.",
+  "license": "MIT",
+  "keywords": [
+    "clawguard",
+    "openclaw",
+    "plugin",
+    "security",
+    "approval"
+  ],
   "files": [
     "src",
     "openclaw.plugin.json"
@@ -13,6 +25,11 @@
     "openclaw": "^2026.3.9"
   },
   "openclaw": {
+    "install": {
+      "npmSpec": "@clawguard/openclaw-clawguard",
+      "localPath": "plugins/openclaw-clawguard",
+      "defaultChoice": "local"
+    },
     "extensions": [
       "./src/index.ts"
     ]

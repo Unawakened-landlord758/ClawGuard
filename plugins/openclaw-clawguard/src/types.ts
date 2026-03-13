@@ -76,6 +76,19 @@ export interface HookDecision {
   readonly blockReason?: string;
 }
 
+export interface MessageSendingSnapshot {
+  readonly to: string;
+  readonly content: string;
+  readonly channelId: string;
+  readonly accountId?: string;
+  readonly conversationId?: string;
+  readonly metadata?: Record<string, unknown>;
+}
+
+export interface MessageSendingDecision {
+  readonly cancel: boolean;
+}
+
 export interface Clock {
   now(): Date;
 }
