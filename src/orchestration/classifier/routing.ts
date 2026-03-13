@@ -40,6 +40,11 @@ const SUPPORTED_TOOL_ROUTES = {
     risk_domain: RiskDomain.Execution,
     pipeline_kind: PipelineKind.WorkspaceMutation,
   },
+  edit: {
+    event_type: RiskEventType.WorkspaceMutation,
+    risk_domain: RiskDomain.Execution,
+    pipeline_kind: PipelineKind.WorkspaceMutation,
+  },
   apply_patch: {
     event_type: RiskEventType.WorkspaceMutation,
     risk_domain: RiskDomain.Execution,

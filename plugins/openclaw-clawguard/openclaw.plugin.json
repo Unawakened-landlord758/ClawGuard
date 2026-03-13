@@ -1,7 +1,7 @@
 {
   "id": "clawguard",
   "name": "ClawGuard",
-  "description": "Install-demo ClawGuard approval gate for OpenClaw with plugin-hosted settings, approvals, and audit pages.",
+  "description": "Install-demo only ClawGuard approval gate for OpenClaw with plugin-hosted settings, approvals, and audit pages. Recommended install uses the local repo path; the package name is an unpublished compatibility placeholder.",
   "version": "0.0.0-demo.0",
   "uiHints": {
     "approvalTtlSeconds": {

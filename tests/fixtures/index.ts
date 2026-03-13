@@ -1,7 +1,7 @@
 import { execFixture } from './exec.js';
 import { outboundFixture } from './outbound.js';
-import { workspaceMutationFixture } from './workspace-mutation.js';
+import { workspaceEditMutationFixture, workspaceMutationFixture } from './workspace-mutation.js';
 
-export { execFixture, outboundFixture, workspaceMutationFixture };
+export { execFixture, outboundFixture, workspaceEditMutationFixture, workspaceMutationFixture };
 
-export const sprint0Fixtures = [execFixture, outboundFixture, workspaceMutationFixture] as const;
+export const sprint0Fixtures = [execFixture, outboundFixture, workspaceMutationFixture, workspaceEditMutationFixture] as const;

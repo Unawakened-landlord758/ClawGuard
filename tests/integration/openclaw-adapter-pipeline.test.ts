@@ -186,6 +186,48 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.audit_record.final_status).toBe(AuditRecordFinalStatus.Allowed);
   });
 
+  it('routes edit through the workspace mutation pipeline and reuses workspace approvals', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'edit',
+          params: {
+            path: '.env',
+            oldText: 'API_KEY=old-value',
+            newText: 'API_KEY=prod_live_secret_value_123456789',
+          },
+          runId: 'run-edit-1',
+          toolCallId: 'tool-edit-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-edit',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['.env'],
+      summary: 'API_KEY=prod_live_secret_value_123456789',
+    });
+    expect(result.evaluation_input.raw_text_candidates).toEqual([
+      'API_KEY=prod_live_secret_value_123456789',
+      '.env',
+      'API_KEY=old-value',
+    ]);
+    expect(result.routing.pipeline_kind).toBe(PipelineKind.WorkspaceMutation);
+    expect(result.rule_matches.map((match) => match.rule_id)).toEqual(
+      expect.arrayContaining(['path.critical.config', 'secret.config-field.pattern']),
+    );
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation',
+      impact_scope: '.env',
+    });
+    expect(result.risk_event.event_type).toBe(RiskEventType.WorkspaceMutation);
+    expect(result.audit_record.final_status).toBe(AuditRecordFinalStatus.Logged);
+  });
+
   it.each([
     {
       caseId: 'env',

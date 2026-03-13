@@ -46,6 +46,7 @@ export function buildApprovalActionTitle(evaluationInput: EvaluationInput): stri
     case 'sessions_send':
       return 'Approve outbound delivery';
     case 'write':
+    case 'edit':
     case 'apply_patch':
       return 'Approve workspace mutation';
     default:

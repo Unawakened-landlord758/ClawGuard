@@ -44,6 +44,14 @@ describe('tool routing', () => {
       },
     },
     {
+      tool_name: ' edit ',
+      expected: {
+        event_type: RiskEventType.WorkspaceMutation,
+        risk_domain: RiskDomain.Execution,
+        pipeline_kind: PipelineKind.WorkspaceMutation,
+      },
+    },
+    {
       tool_name: ' apply_patch ',
       expected: {
         event_type: RiskEventType.WorkspaceMutation,

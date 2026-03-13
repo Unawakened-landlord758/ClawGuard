@@ -16,6 +16,7 @@ import type { Clock } from '../../plugins/openclaw-clawguard/src/types.js';
 
 const loaderModule = await import('../../openclaw/src/plugins/loader.js').catch(() => null);
 const loadOpenClawPlugins = loaderModule?.loadOpenClawPlugins;
+const installDemoPluginRoot = path.resolve('plugins', 'openclaw-clawguard');
 
 class FakeClock implements Clock {
   private current = new Date('2026-03-12T00:00:00.000Z');
@@ -266,6 +267,12 @@ function listPluginSourceFiles(root: string): string[] {
   });
 }
 
+function listInstallDemoPackageSurface(root: string): string[] {
+  return readdirSync(root, { withFileTypes: true })
+    .map((entry) => entry.name)
+    .sort();
+}
+
 function getAuditKinds(state: ReturnType<typeof createClawGuardState>): string[] {
   return state.audit.list().map((entry) => entry.kind);
 }
@@ -297,11 +304,11 @@ describe('OpenClaw ClawGuard plugin spike', () => {
   });
 
   it('keeps package metadata and manifest aligned for the local install demo path', () => {
-    const pluginRoot = path.resolve('plugins', 'openclaw-clawguard');
-    const packageManifest = JSON.parse(readFileSync(path.join(pluginRoot, 'package.json'), 'utf8')) as {
+    const packageManifest = JSON.parse(readFileSync(path.join(installDemoPluginRoot, 'package.json'), 'utf8')) as {
       name: string;
       version: string;
       description: string;
+      main: string;
       files: string[];
       exports: Record<string, string>;
       openclaw: {
@@ -310,22 +317,30 @@ describe('OpenClaw ClawGuard plugin spike', () => {
           npmSpec: string;
           localPath: string;
           defaultChoice: string;
+          published: boolean;
+          recommendedMethod: string;
+          optionalMethod: string;
+          packageNamePosture: string;
         };
       };
     };
     const pluginManifest = JSON.parse(
-      readFileSync(path.join(pluginRoot, 'openclaw.plugin.json'), 'utf8'),
+      readFileSync(path.join(installDemoPluginRoot, 'openclaw.plugin.json'), 'utf8'),
     ) as {
       id: string;
       name: string;
       version: string;
       description: string;
     };
+    const surface = listInstallDemoPackageSurface(installDemoPluginRoot);
 
     expect(packageManifest.name).toBe('@clawguard/openclaw-clawguard');
     expect(packageManifest.version).toBe('0.0.0-demo.0');
     expect(packageManifest.description).toContain('Install-demo');
-    expect(packageManifest.files).toEqual(expect.arrayContaining(['src', 'openclaw.plugin.json']));
+    expect(packageManifest.main).toBe('./src/index.ts');
+    expect(packageManifest.files).toEqual(
+      expect.arrayContaining(['src', 'openclaw.plugin.json', 'README.md']),
+    );
     expect(packageManifest.exports).toMatchObject({
       '.': './src/index.ts',
       './manifest': './openclaw.plugin.json',
@@ -336,20 +351,84 @@ describe('OpenClaw ClawGuard plugin spike', () => {
         npmSpec: '@clawguard/openclaw-clawguard',
         localPath: 'plugins/openclaw-clawguard',
         defaultChoice: 'local',
+        published: false,
+        recommendedMethod: 'local-path-from-repo-root',
+        optionalMethod: 'local-tarball-only',
+        packageNamePosture: 'metadata and future compatibility placeholder only',
       },
     });
+    expect(surface).toEqual(expect.arrayContaining(['README.md', 'openclaw.plugin.json', 'src']));
 
     expect(pluginManifest).toMatchObject({
       id: 'clawguard',
       name: 'ClawGuard',
       version: packageManifest.version,
     });
+    expect(pluginManifest.description).toContain('Recommended install uses the local repo path');
     expect(pluginManifest.description).toContain('plugin-hosted settings, approvals, and audit pages');
   });
 
+  it('documents the install demo smoke path and demo-only limitations in the plugin README', () => {
+    const readmePath = path.join(installDemoPluginRoot, 'README.md');
+    expect(existsSync(readmePath)).toBe(true);
+
+    const readme = readFileSync(readmePath, 'utf8');
+
+    expect(readme).toContain('ClawGuard for OpenClaw install demo');
+    expect(readme).toContain('not published to any registry');
+    expect(readme).toContain('Recommended install method: local path from repo root');
+    expect(readme).toContain('openclaw plugins install .\\plugins\\openclaw-clawguard');
+    expect(readme).toContain('Optional method: local tarball only');
+    expect(readme).toContain('pnpm --dir plugins\\openclaw-clawguard pack');
+    expect(readme).toContain('How to verify the plugin loaded');
+    expect(readme).toContain('Smoke path');
+    expect(readme).toContain('/plugins/clawguard/settings');
+    expect(readme).toContain('/plugins/clawguard/approvals');
+    expect(readme).toContain('/plugins/clawguard/audit');
+    expect(readme).toContain('Current limitations');
+    expect(readme).toContain('install posture is demo-only and local-only');
+    expect(readme).toContain('no registry publish should be implied');
+    expect(readme).toContain('outbound coverage is still intentionally minimal');
+    expect(readme).toContain('host-level outbound coverage is currently only `message_sending` hard block');
+  });
+
+  it('keeps the install demo package surface and local-path install constraints explicit', () => {
+    const packageManifest = JSON.parse(
+      readFileSync(path.join(installDemoPluginRoot, 'package.json'), 'utf8'),
+    ) as {
+      files: string[];
+      openclaw: {
+        install: {
+          npmSpec: string;
+          localPath: string;
+          defaultChoice: string;
+          published: boolean;
+          recommendedMethod: string;
+          optionalMethod: string;
+        };
+      };
+    };
+    const resolvedLocalInstallRoot = path.resolve(packageManifest.openclaw.install.localPath);
+    const extensionEntry = path.join(installDemoPluginRoot, 'src', 'index.ts');
+
+    expect(packageManifest.files).toEqual(
+      expect.arrayContaining(['src', 'openclaw.plugin.json', 'README.md']),
+    );
+    expect(packageManifest.openclaw.install).toMatchObject({
+      npmSpec: '@clawguard/openclaw-clawguard',
+      localPath: 'plugins/openclaw-clawguard',
+      defaultChoice: 'local',
+      published: false,
+      recommendedMethod: 'local-path-from-repo-root',
+      optionalMethod: 'local-tarball-only',
+    });
+    expect(resolvedLocalInstallRoot).toBe(installDemoPluginRoot);
+    expect(existsSync(extensionEntry)).toBe(true);
+    expect(readFileSync(extensionEntry, 'utf8')).toContain("export default plugin;");
+  });
+
   it('uses stable package imports and avoids repo-root source hops or process execution APIs', () => {
-    const pluginRoot = path.resolve('plugins', 'openclaw-clawguard');
-    const sourceFiles = listPluginSourceFiles(path.join(pluginRoot, 'src'));
+    const sourceFiles = listPluginSourceFiles(path.join(installDemoPluginRoot, 'src'));
 
     expect(sourceFiles.length).toBeGreaterThan(0);
 
@@ -360,10 +439,13 @@ describe('OpenClaw ClawGuard plugin spike', () => {
       assertNoProcessExecutionImports(contents);
     }
 
-    const indexSource = readFileSync(path.join(pluginRoot, 'src', 'index.ts'), 'utf8');
+    const indexSource = readFileSync(path.join(installDemoPluginRoot, 'src', 'index.ts'), 'utf8');
     expect(indexSource).toContain("from 'openclaw/plugin-sdk/core'");
 
-    const stateSource = readFileSync(path.join(pluginRoot, 'src', 'services', 'state.ts'), 'utf8');
+    const stateSource = readFileSync(
+      path.join(installDemoPluginRoot, 'src', 'services', 'state.ts'),
+      'utf8',
+    );
     expect(stateSource).toContain("from 'clawguard'");
   });
 
@@ -1009,6 +1091,9 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(htmlResponse.statusCode).toBe(200);
     expect(htmlResponse.body).toContain('openclaw plugins install .\\plugins\\openclaw-clawguard');
     expect(htmlResponse.body).toContain('not published');
+    expect(htmlResponse.body).toContain('pnpm --dir plugins\\openclaw-clawguard pack');
+    expect(htmlResponse.body).toContain('/plugins/clawguard/settings</code>, <code>/plugins/clawguard/approvals</code>, <code>/plugins/clawguard/audit');
+    expect(htmlResponse.body).toContain('message_sending hard block');
     expect(htmlResponse.body).toContain('docs/v1-installer-demo-strategy.md');
 
     const jsonResponse = createMockResponse();
@@ -1024,11 +1109,22 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(JSON.parse(jsonResponse.body)).toMatchObject({
       approvalTtlSeconds: 120,
       installDemo: {
+        title: 'ClawGuard for OpenClaw install demo',
+        releaseStatus: 'Install demo only. Not a formal release.',
         published: false,
         packageName: '@clawguard/openclaw-clawguard',
+        recommendedMethod: 'Local path install from the repo root.',
         recommendedCommand: 'openclaw plugins install .\\plugins\\openclaw-clawguard',
+        optionalMethod: 'Local tarball install only. No registry implication.',
         optionalPackedArtifactHint: 'pnpm --dir plugins\\openclaw-clawguard pack',
         docsPath: 'docs/v1-installer-demo-strategy.md',
+        smokePaths: [
+          '/plugins/clawguard/settings',
+          '/plugins/clawguard/approvals',
+          '/plugins/clawguard/audit',
+        ],
+        limitations:
+          'Host-level outbound coverage is currently only the message_sending hard block, not the full outbound lifecycle.',
       },
     });
   });

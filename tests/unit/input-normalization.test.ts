@@ -1,5 +1,5 @@
 import { normalizeOpenClawInputs } from '../../src/index.js';
-import { execFixture, outboundFixture, workspaceMutationFixture } from '../fixtures/index.js';
+import { execFixture, outboundFixture, workspaceEditMutationFixture, workspaceMutationFixture } from '../fixtures/index.js';
 
 import { describe, expect, it } from 'vitest';
 
@@ -50,6 +50,17 @@ describe('Sprint 0 input normalization', () => {
       paths: workspaceMutationFixture.expected.changed_paths,
       summary: 'export const featureFlag = true;',
     });
+  });
+
+  it('normalizes edit mutations into workspace context and text candidates', () => {
+    const normalized = normalizeOpenClawInputs(workspaceEditMutationFixture.args);
+
+    expect(normalized.evaluation_input.tool_name).toBe(workspaceEditMutationFixture.expected.tool_name);
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: workspaceEditMutationFixture.expected.changed_paths,
+      summary: 'API_KEY=prod_live_secret_value_123456789',
+    });
+    expect(normalized.evaluation_input.raw_text_candidates).toEqual(workspaceEditMutationFixture.expected.raw_text_candidates);
   });
 
   it('extracts a single file path from apply_patch text', () => {

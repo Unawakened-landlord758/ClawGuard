@@ -7,7 +7,7 @@
     ".": "./src/index.ts",
     "./manifest": "./openclaw.plugin.json"
   },
-  "description": "Install-demo ClawGuard approval plugin for OpenClaw.",
+  "description": "Install-demo only ClawGuard plugin for OpenClaw. Recommended install uses the local repo path; @clawguard/openclaw-clawguard is an unpublished compatibility placeholder.",
   "license": "MIT",
   "keywords": [
     "clawguard",
@@ -18,7 +18,8 @@
   ],
   "files": [
     "src",
-    "openclaw.plugin.json"
+    "openclaw.plugin.json",
+    "README.md"
   ],
   "peerDependencies": {
     "clawguard": "^0.0.0",
@@ -28,7 +29,11 @@
     "install": {
       "npmSpec": "@clawguard/openclaw-clawguard",
       "localPath": "plugins/openclaw-clawguard",
-      "defaultChoice": "local"
+      "defaultChoice": "local",
+      "published": false,
+      "recommendedMethod": "local-path-from-repo-root",
+      "optionalMethod": "local-tarball-only",
+      "packageNamePosture": "metadata and future compatibility placeholder only"
     },
     "extensions": [
       "./src/index.ts"

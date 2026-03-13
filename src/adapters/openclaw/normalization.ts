@@ -172,7 +172,8 @@ function normalizeWorkspaceContext(
   toolParams: Record<string, unknown>,
 ): WorkspaceContext | undefined {
   const normalizedToolName = normalizeToolName(toolName);
-  const isWorkspaceTool = normalizedToolName === 'write' || normalizedToolName === 'apply_patch';
+  const isWorkspaceTool =
+    normalizedToolName === 'write' || normalizedToolName === 'edit' || normalizedToolName === 'apply_patch';
   if (!isWorkspaceTool) {
     return undefined;
   }
@@ -186,7 +187,7 @@ function normalizeWorkspaceContext(
 
   return {
     paths: candidatePaths,
-    summary: firstString(toolParams, ['patch', 'patchText', 'content']),
+    summary: firstString(toolParams, ['patch', 'patchText', 'content', 'newText', 'new_string', 'oldText', 'old_string']),
   };
 }
 
@@ -238,7 +239,7 @@ export function normalizeToolStatus(agentEvent: OpenClawAgentEventInput | undefi
 
 function collectRawTextCandidates(toolParams: Record<string, unknown>): string[] {
   return dedupeStrings([
-    firstString(toolParams, ['command', 'text', 'message', 'content', 'patch']),
+    firstString(toolParams, ['command', 'text', 'message', 'content', 'patch', 'newText', 'new_string', 'oldText', 'old_string']),
     ...Object.values(toolParams)
       .map((value) => normalizeOptionalString(value))
       .filter((value): value is string => Boolean(value)),
