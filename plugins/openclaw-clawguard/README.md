@@ -6,18 +6,23 @@ This directory contains the **ClawGuard for OpenClaw install demo**.
 - It is **not published to any registry**
 - The package name `@clawguard/openclaw-clawguard` is metadata only and a future-compatibility placeholder
 
+> [!IMPORTANT]
+> **Install demo only.**
+> Use the local path install as the default path, treat the local tarball as optional local packaging only, and keep all public walkthroughs **fake-only**.
+
 ## Current coverage
 
 This install demo currently covers:
 
 - risky `exec`
 - minimal outbound coverage
-- minimal workspace mutation coverage for `write` / `edit` / `apply_patch` actions, with alpha-safe checks for key config files, repo automation metadata, and obvious out-of-workspace writes
+- minimal workspace mutation coverage for `write` / `edit` / `apply_patch` actions, with alpha-safe checks for key config files, repo automation metadata, and obvious out-of-workspace writes; this is the current demo surface, not broad workspace coverage
 - plugin-hosted pages at `/plugins/clawguard/settings`, `/plugins/clawguard/approvals`, and `/plugins/clawguard/audit`
 
 Current limitation:
 
 - host-level outbound now keeps hard blocks on `message_sending` and closes allowed / failed delivery on `message_sent`, while approval ownership stays on tool-level `message` / `sessions_send`
+- these outbound points are intentionally minimal and fake-only; they should not be described as complete outbound lifecycle coverage
 
 ## Recommended install method: local path from repo root
 
@@ -69,6 +74,8 @@ Current practical options for a future embedded experience are:
 2. add a custom/patched Control UI nav link that points at that route
 3. wait for or contribute an upstream OpenClaw plugin-navigation API
 
+None of those embedded options are part of this first usable version. Today the demo surface is still the direct plugin-owned routes above.
+
 ## Smoke path
 
 - `/plugins/clawguard/settings`
@@ -104,6 +111,13 @@ Use this as the short operator script for public demo recordings or local walkth
 7. Close with the reminder that this is demo-only, unpublished, and not proof of real dangerous execution or real outbound delivery
 
 ## Fake-only demo scenarios
+
+All public or local walkthroughs below should stay **fake-only**:
+
+- no real dangerous command execution,
+- no real outbound delivery verification,
+- no real payment / red-packet movement,
+- no production-sensitive workspace changes.
 
 ### 1. Exec risk
 

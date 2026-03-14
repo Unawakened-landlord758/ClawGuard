@@ -33,6 +33,12 @@
 
 这个仓库现在已经有了**第一条 OpenClaw 安装 Demo**。
 
+当前这版 **first usable version（首个可用版）** 应被克制地理解为：
+
+- 一条 **本地安装 + 页面 smoke + fake-only 演示** 的最小包
+- 足以讲清首个插件自带 approvals / audit / settings 闭环
+- **不是**正式 release、不是 GA，也不是成熟覆盖声明
+
 当前 demo 覆盖范围是：
 
 - **高风险 `exec`**
@@ -110,8 +116,9 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
 - **不是正式 release**
 - **不能当成 GA 或完整产品发布来理解**
 - **outbound 覆盖仍然是最小版本**
-- **宿主级 outbound 当前只有 `message_sending` hard block，不是完整 outbound 生命周期**
+- **宿主级 outbound 当前只有 `message_sending` hard block，并通过 `message_sent` 回收允许/失败结果；工具级 `message` / `sessions_send` 审批链与它并存，但这仍只是两处最小 fake-only review point，不是完整 outbound 生命周期**
 - **审批闭环当前仍然是 pending-action + allow-once retry 的 demo 形态**
+- **Control UI 内嵌、安全左侧导航、patched UI 等工作明确不在这个 first usable version 范围内；当前仍以直达 `/plugins/clawguard/*` 路由为准**
 - **不应把当前 demo 理解成真实危险执行、真实红包 / 转账执行，或正式发布级验证**
 
 ## 文档地图
