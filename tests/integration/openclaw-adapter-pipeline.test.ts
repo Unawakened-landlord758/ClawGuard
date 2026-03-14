@@ -178,12 +178,114 @@ describe('OpenClaw adapter pipeline', () => {
       },
     });
 
-    expect(result.evaluation_input.workspace_context?.paths).toEqual(['src\\generated\\feature-flags.ts']);
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\generated\\feature-flags.ts'],
+      summary:
+        '*** Begin Patch\n*** Update File: src\\generated\\feature-flags.ts\n+export const featureFlag = true;\n*** End Patch',
+      operation_type: 'modify',
+    });
     expect(result.routing.pipeline_kind).toBe(PipelineKind.WorkspaceMutation);
     expect(result.risk_event.event_type).toBe(RiskEventType.WorkspaceMutation);
     expect(result.risk_event.risk_domain).toBe(RiskDomain.Execution);
     expect(result.risk_event.status).toBe(RiskEventStatus.Allowed);
     expect(result.audit_record.final_status).toBe(AuditRecordFinalStatus.Allowed);
+  });
+
+  it('surfaces high-confidence path-pair rename-like semantics in workspace approvals and audit artifacts', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'write',
+          params: {
+            fromPath: 'src\\templates\\ci-template.yml',
+            toPath: '.github\\workflows\\ci-template.yml',
+            content: 'name: CI\n',
+          },
+          runId: 'run-write-move-1',
+          toolCallId: 'tool-write-move-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-write-move',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\ci-template.yml', '.github\\workflows\\ci-template.yml'],
+      summary: 'name: CI',
+      operation_type: 'rename-like',
+    });
+    expect(result.rule_matches.map((match) => match.rule_id)).toContain('path.repo.workflow');
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (rename-like)',
+      impact_scope: 'src\\templates\\ci-template.yml, .github\\workflows\\ci-template.yml',
+    });
+    expect(result.risk_event.summary).toContain('rename-like');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
+  });
+
+  it('surfaces add-file apply_patch semantics in approval and audit artifacts', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'apply_patch',
+          params: {
+            patch:
+              '*** Begin Patch\n*** Add File: .github\\workflows\\ci.yml\n+name: CI\n*** End Patch\n',
+          },
+          runId: 'run-patch-add-1',
+          toolCallId: 'tool-patch-add-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-patch-add',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['.github\\workflows\\ci.yml'],
+      summary: '*** Begin Patch\n*** Add File: .github\\workflows\\ci.yml\n+name: CI\n*** End Patch',
+      operation_type: 'add',
+    });
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (add)',
+      impact_scope: '.github\\workflows\\ci.yml',
+    });
+    expect(result.risk_event.summary).toContain('add');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=add.');
+  });
+
+  it('surfaces delete apply_patch semantics conservatively for mixed patch actions', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'apply_patch',
+          params: {
+            patch:
+              '*** Begin Patch\n*** Add File: src\\generated\\new-file.ts\n+export const created = true;\n*** Update File: .env\n@@\n-API_KEY=old-value\n+API_KEY=prod_live_secret_value_123456789\n*** Delete File: src\\generated\\old-file.ts\n*** End Patch\n',
+          },
+          runId: 'run-patch-mixed-1',
+          toolCallId: 'tool-patch-mixed-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-patch-mixed',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context?.operation_type).toBe('delete');
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (delete)',
+      impact_scope: 'src\\generated\\new-file.ts, .env, src\\generated\\old-file.ts',
+    });
+    expect(result.risk_event.summary).toContain('delete');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=delete.');
   });
 
   it('routes edit through the workspace mutation pipeline and reuses workspace approvals', () => {
@@ -426,9 +528,11 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.rule_matches.map((match) => match.rule_id)).toContain('path.repo.workflow');
     expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
     expect(result.approval_request).toMatchObject({
-      action_title: 'Approve workspace mutation',
+      action_title: 'Approve workspace mutation (rename-like)',
       impact_scope: 'src\\templates\\ci-template.yml, .github\\workflows\\ci.yml',
     });
+    expect(result.risk_event.summary).toContain('rename-like');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
   });
 
   it('requires approval for outbound delivery when a high-confidence access token is detected', () => {

@@ -84,6 +84,7 @@ export enum ApprovalCategory {
 }
 
 export enum WorkspaceMutationOperationType {
+  Add = 'add',
   Insert = 'insert',
   Delete = 'delete',
   Modify = 'modify',

@@ -92,6 +92,8 @@ function formatWorkspaceOperationType(operationType: WorkspaceMutationOperationT
   switch (operationType) {
     case WorkspaceMutationOperationType.RenameLike:
       return 'rename-like';
+    case WorkspaceMutationOperationType.Add:
+      return 'add';
     case WorkspaceMutationOperationType.Insert:
       return 'insert';
     case WorkspaceMutationOperationType.Delete:

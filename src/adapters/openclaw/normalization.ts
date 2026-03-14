@@ -186,7 +186,7 @@ function normalizeWorkspaceContext(
 
   const patchText = firstString(toolParams, ['patch', 'patchText']);
   const candidatePaths = dedupeStrings([
-    firstString(toolParams, ['path', 'filePath', 'patchPath', 'fromPath', 'toPath', 'oldPath', 'newPath']),
+    ...readStringsFromKeys(toolParams, ['path', 'filePath', 'patchPath', 'fromPath', 'toPath', 'oldPath', 'newPath']),
     ...readStringArray(toolParams.paths),
     ...extractPatchPaths(patchText),
   ]);
@@ -278,7 +278,14 @@ function readStringArray(value: unknown): string[] {
 
   return value
     .map((entry) => normalizeOptionalString(entry))
-    .filter((entry): entry is string => Boolean(entry));
+      .filter((entry): entry is string => Boolean(entry));
+}
+
+function readStringsFromKeys(source: Record<string, unknown>, keys: readonly string[]): string[] {
+  return keys
+    .map((key) => source[key])
+    .map((value) => normalizeOptionalString(value))
+    .filter((value): value is string => Boolean(value));
 }
 
 function extractPatchPaths(patchText: string | undefined): string[] {

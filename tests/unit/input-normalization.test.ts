@@ -55,6 +55,54 @@ describe('Sprint 0 input normalization', () => {
     });
   });
 
+  it('normalizes high-confidence path-pair workspace moves as rename-like', () => {
+    const normalized = normalizeOpenClawInputs({
+      before_tool_call: {
+        event: {
+          toolName: 'write',
+          params: {
+            fromPath: 'src\\templates\\approval-policy.ts',
+            toPath: 'src\\guards\\approval-policy.ts',
+            content: 'export const approvalPolicy = true;',
+          },
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-write-move',
+      },
+    });
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\approval-policy.ts', 'src\\guards\\approval-policy.ts'],
+      summary: 'export const approvalPolicy = true;',
+      operation_type: 'rename-like',
+    });
+  });
+
+  it('keeps low-confidence path-pair workspace replacements on modify semantics', () => {
+    const normalized = normalizeOpenClawInputs({
+      before_tool_call: {
+        event: {
+          toolName: 'write',
+          params: {
+            oldPath: 'src\\templates\\approval-policy.ts',
+            newPath: 'src\\guards\\runtime-shell.ts',
+            content: 'export const approvalPolicy = true;',
+          },
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-write-replacement',
+      },
+    });
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\approval-policy.ts', 'src\\guards\\runtime-shell.ts'],
+      summary: 'export const approvalPolicy = true;',
+      operation_type: 'modify',
+    });
+  });
+
   it('normalizes edit mutations into workspace context and text candidates', () => {
     const normalized = normalizeOpenClawInputs(workspaceEditMutationFixture.args);
 
@@ -176,7 +224,7 @@ describe('Sprint 0 input normalization', () => {
       paths: ['src\\risk\\engine.ts'],
       summary:
         '*** Begin Patch\n*** Update File: src\\risk\\engine.ts\n@@\n-export const oldValue = 1;\n+export const oldValue = 2;\n*** End Patch',
-      operation_type: undefined,
+      operation_type: 'modify',
     });
   });
 
@@ -193,6 +241,7 @@ describe('Sprint 0 input normalization', () => {
       'src\\generated\\existing-file.ts',
       'src\\generated\\old-file.ts',
     ]);
+    expect(normalized.evaluation_input.workspace_context?.operation_type).toBe('delete');
   });
 
   it('extracts patchPath and move targets into the workspace mutation path set', () => {
@@ -208,6 +257,7 @@ describe('Sprint 0 input normalization', () => {
       'src\\templates\\ci-template.yml',
       '.github\\workflows\\ci.yml',
     ]);
+    expect(normalized.evaluation_input.workspace_context?.operation_type).toBe('rename-like');
   });
 
   it('extracts diff header paths from a slash-prefixed patch', () => {
@@ -218,7 +268,53 @@ describe('Sprint 0 input normalization', () => {
       }),
     );
 
-    expect(normalized.evaluation_input.workspace_context?.paths).toEqual(['src/app.ts']);
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['src/app.ts'],
+      summary:
+        'diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-console.log("before");\n+console.log("after");',
+      operation_type: 'modify',
+    });
+  });
+
+  it.each([
+    {
+      label: 'add-file header',
+      patch: '*** Begin Patch\n*** Add File: src\\generated\\new-file.ts\n+export const created = true;\n*** End Patch\n',
+      expectedOperationType: 'add',
+    },
+    {
+      label: 'delete-file header',
+      patch: '*** Begin Patch\n*** Delete File: src\\generated\\old-file.ts\n*** End Patch\n',
+      expectedOperationType: 'delete',
+    },
+    {
+      label: 'update-file header',
+      patch:
+        '*** Begin Patch\n*** Update File: src\\generated\\existing-file.ts\n@@\n-export const flag = false;\n+export const flag = true;\n*** End Patch\n',
+      expectedOperationType: 'modify',
+    },
+    {
+      label: 'git rename header',
+      patch:
+        'diff --git a/src\\legacy.ts b/src\\clawguard.ts\nsimilarity index 100%\nrename from src\\legacy.ts\nrename to src\\clawguard.ts\n',
+      expectedOperationType: 'rename-like',
+    },
+    {
+      label: 'git copy header',
+      patch:
+        'diff --git a/src\\legacy.ts b/src\\clawguard.ts\nsimilarity index 100%\ncopy from src\\legacy.ts\ncopy to src\\clawguard.ts\n',
+      expectedOperationType: 'rename-like',
+    },
+    {
+      label: 'git new-file diff metadata',
+      patch:
+        'diff --git a/src\\generated\\new-file.ts b/src\\generated\\new-file.ts\nnew file mode 100644\n--- /dev/null\n+++ b/src\\generated\\new-file.ts\n@@ -0,0 +1 @@\n+export const created = true;\n',
+      expectedOperationType: 'add',
+    },
+  ])('classifies apply_patch workspace mutation semantics for $label', ({ expectedOperationType, patch }) => {
+    const normalized = normalizeOpenClawInputs(buildApplyPatchArgs({ patch }));
+
+    expect(normalized.evaluation_input.workspace_context?.operation_type).toBe(expectedOperationType);
   });
 
   it('merges structured paths with patch-extracted paths without duplicates', () => {

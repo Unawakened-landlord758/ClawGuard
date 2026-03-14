@@ -154,10 +154,18 @@ function createOutboundEvent({
 }
 
 function createWorkspaceWriteEvent({
-  path: filePath = 'src\\generated\\feature-flags.ts',
+  path: filePath,
+  fromPath,
+  toPath,
+  oldPath,
+  newPath,
   content = 'export const featureFlag = true;\n',
 }: {
   path?: string;
+  fromPath?: string;
+  toPath?: string;
+  oldPath?: string;
+  newPath?: string;
   content?: string;
 } = {}): {
   event: {
@@ -172,13 +180,22 @@ function createWorkspaceWriteEvent({
     agentId: string;
   };
 } {
+  const resolvedPath =
+    filePath ?? (fromPath || toPath || oldPath || newPath ? undefined : 'src\\generated\\feature-flags.ts');
+
   return {
     event: {
       toolName: 'write',
-      params: {
-        path: filePath,
-        content,
-      },
+      params: Object.fromEntries(
+        [
+          ['path', resolvedPath],
+          ['fromPath', fromPath],
+          ['toPath', toPath],
+          ['oldPath', oldPath],
+          ['newPath', newPath],
+          ['content', content],
+        ].filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      ),
       runId: 'run-workspace-write-1',
       toolCallId: 'tool-workspace-write-1',
     },
@@ -819,6 +836,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(pending.risk_level).toBe(artifacts.risk_event.severity);
     expect(pending.impact_scope).toBe(artifacts.approval_request?.impact_scope);
     expect(pending.guidance_summary).toBe(artifacts.risk_event.summary);
+    expect(pending.guidance_summary).toContain('modify');
     expect(result?.blockReason).toContain(`Reason: ${artifacts.approval_request?.reason_summary}`);
     expect(result?.blockReason).toContain(`Guidance: ${artifacts.risk_event.summary}`);
     expect(result?.blockReason).toContain(`Impact scope: ${artifacts.approval_request?.impact_scope}`);
@@ -827,6 +845,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
   it('keeps workflow-targeted patch moves inside the same workspace mutation approval queue', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
+    const route = createApprovalsRoute(state);
     const { event, context } = createWorkspacePatchEvent({
       patchPath: 'src\\templates\\ci-template.yml',
       patch: `*** Begin Patch
@@ -837,17 +856,30 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 `,
     });
     const artifacts = buildCoreWorkspaceArtifacts(event, context);
+    const htmlResponse = createMockResponse();
 
     expect(artifacts.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
     expect(artifacts.rule_matches.map((match) => match.rule_id)).toContain('path.repo.workflow');
-    expect(artifacts.approval_request?.action_title).toBe('Approve workspace mutation');
+    expect(artifacts.approval_request?.action_title).toBe('Approve workspace mutation (rename-like)');
 
     const result = beforeHandler(event, context);
     const pending = state.pendingActions.list()[0];
 
+    route(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/approvals',
+      } as never,
+      htmlResponse as never,
+    );
+
     expect(result).toMatchObject({ block: true });
     expect(pending.tool_name).toBe('apply_patch');
     expect(pending.impact_scope).toBe('src\\templates\\ci-template.yml, .github\\workflows\\ci.yml');
+    expect(pending.guidance_summary).toContain('rename-like');
+    expect(result?.blockReason).toContain('rename-like');
+    expect(htmlResponse.statusCode).toBe(200);
+    expect(htmlResponse.body).toContain('rename-like');
     expect(result?.blockReason).toContain('Impact scope: src\\templates\\ci-template.yml, .github\\workflows\\ci.yml');
   });
 
@@ -923,6 +955,42 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(htmlResponse.body).toContain('Guidance:</strong>');
     expect(htmlResponse.body).toContain('rename-like');
     expect(htmlResponse.body).toContain('Impact scope:</strong> .env');
+    expect(getLatestAuditByKind(state, 'blocked')?.detail).toContain('rename-like');
+  });
+
+  it('surfaces shared path-pair rename-like semantics in pending-action messaging and approvals HTML', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const route = createApprovalsRoute(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: undefined,
+      fromPath: 'src\\templates\\ci-template.yml',
+      toPath: '.github\\workflows\\ci-template.yml',
+      content: 'name: CI\n',
+    });
+
+    const result = beforeHandler(event, context);
+    const pending = state.pendingActions.list()[0];
+    const htmlResponse = createMockResponse();
+
+    route(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/approvals',
+      } as never,
+      htmlResponse as never,
+    );
+
+    expect(result).toMatchObject({ block: true });
+    expect(pending.tool_name).toBe('write');
+    expect(pending.impact_scope).toBe('src\\templates\\ci-template.yml, .github\\workflows\\ci-template.yml');
+    expect(pending.guidance_summary).toContain('rename-like');
+    expect(result?.blockReason).toContain('rename-like');
+    expect(htmlResponse.statusCode).toBe(200);
+    expect(htmlResponse.body).toContain('rename-like');
+    expect(htmlResponse.body).toContain(
+      'Impact scope:</strong> src\\templates\\ci-template.yml, .github\\workflows\\ci-template.yml',
+    );
     expect(getLatestAuditByKind(state, 'blocked')?.detail).toContain('rename-like');
   });
 
