@@ -36,7 +36,7 @@
 当前这版 **first usable version（首个可用版）** 应被克制地理解为：
 
 - 一条 **本地安装 + 页面 smoke + fake-only 演示** 的最小包
-- 足以讲清首个插件自带 dashboard / approvals / audit / settings 闭环
+- 足以讲清首个插件自带 dashboard / checkup / approvals / audit / settings 闭环
 - **不是**正式 release、不是 GA，也不是成熟覆盖声明
 
 当前 demo 覆盖范围是：
@@ -44,8 +44,9 @@
 - **高风险 `exec`**
 - **最小 outbound 覆盖**
 - **最小 workspace mutation 覆盖（当前统一指 `write` / `edit` / `apply_patch` 这组动作）**
-- **插件自带的 dashboard / approvals / audit / settings 页面**：
+- **插件自带的 dashboard / checkup / approvals / audit / settings 页面**：
   - `/plugins/clawguard/dashboard`
+  - `/plugins/clawguard/checkup`
   - `/plugins/clawguard/approvals`
   - `/plugins/clawguard/audit`
   - `/plugins/clawguard/settings`
@@ -85,6 +86,7 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
 安装后请重启 OpenClaw，再按插件 README 里的 operator runbook 走 smoke path、1 分钟 demo 顺序和 3 分钟 demo 顺序。当前 smoke path 是：
 
 - `/plugins/clawguard/dashboard`
+- `/plugins/clawguard/checkup`
 - `/plugins/clawguard/approvals`
 - `/plugins/clawguard/audit`
 - `/plugins/clawguard/settings`
@@ -103,7 +105,7 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
    - 风险文件改动可以走相同的审批 / 审计链路
    - 当前对外统一口径是：`write` / `edit` / `apply_patch` 都属于这条 workspace mutation actions demo surface
 4. **插件页面演示面**
-   - dashboard / approvals / audit / settings 是当前 demo 的主要承载面
+  - dashboard / checkup / approvals / audit / settings 是当前 demo 的主要承载面
 
 对外叙事上，主 Demo 仍然是：
 

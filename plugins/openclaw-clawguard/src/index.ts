@@ -7,11 +7,13 @@ import { createMessageSentHandler } from './hooks/message-sent.js';
 import { createMessageSendingHandler } from './hooks/message-sending.js';
 import { createApprovalsRoute } from './routes/approvals.js';
 import { createAuditRoute } from './routes/audit.js';
+import { createCheckupRoute } from './routes/checkup.js';
 import { createDashboardRoute } from './routes/dashboard.js';
 import { createSettingsRoute } from './routes/settings.js';
 import {
   APPROVALS_ROUTE_PATH,
   AUDIT_ROUTE_PATH,
+  CHECKUP_ROUTE_PATH,
   DASHBOARD_ROUTE_PATH,
   SETTINGS_ROUTE_PATH,
 } from './routes/shared.js';
@@ -67,6 +69,12 @@ const plugin = {
       auth: 'gateway',
       match: 'exact',
       handler: createDashboardRoute(state),
+    });
+    api.registerHttpRoute({
+      path: CHECKUP_ROUTE_PATH,
+      auth: 'gateway',
+      match: 'exact',
+      handler: createCheckupRoute(state),
     });
     api.registerHttpRoute({
       path: APPROVALS_ROUTE_PATH,

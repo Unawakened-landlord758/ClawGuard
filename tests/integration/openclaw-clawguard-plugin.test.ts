@@ -14,6 +14,7 @@ import { createMessageSentHandler } from '../../plugins/openclaw-clawguard/src/h
 import { createMessageSendingHandler } from '../../plugins/openclaw-clawguard/src/hooks/message-sending.js';
 import { createApprovalsRoute } from '../../plugins/openclaw-clawguard/src/routes/approvals.js';
 import { createAuditRoute } from '../../plugins/openclaw-clawguard/src/routes/audit.js';
+import { createCheckupRoute } from '../../plugins/openclaw-clawguard/src/routes/checkup.js';
 import { createDashboardRoute } from '../../plugins/openclaw-clawguard/src/routes/dashboard.js';
 import { createSettingsRoute } from '../../plugins/openclaw-clawguard/src/routes/settings.js';
 import { createClawGuardState } from '../../plugins/openclaw-clawguard/src/services/state.js';
@@ -503,6 +504,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(readme).toContain('How to verify the plugin loaded');
     expect(readme).toContain('Smoke path');
     expect(readme).toContain('/plugins/clawguard/dashboard');
+    expect(readme).toContain('/plugins/clawguard/checkup');
     expect(readme).toContain('/plugins/clawguard/settings');
     expect(readme).toContain('/plugins/clawguard/approvals');
     expect(readme).toContain('/plugins/clawguard/audit');
@@ -1436,6 +1438,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
         docsPath: 'docs/v1-installer-demo-strategy.md',
         smokePaths: [
           '/plugins/clawguard/dashboard',
+          '/plugins/clawguard/checkup',
           '/plugins/clawguard/approvals',
           '/plugins/clawguard/audit',
           '/plugins/clawguard/settings',
@@ -1450,6 +1453,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     const state = createClawGuardState({ approvalTtlSeconds: 120 });
     const beforeHandler = createBeforeToolCallHandler(state);
     const dashboardRoute = createDashboardRoute(state);
+    const checkupRoute = createCheckupRoute(state);
     const settingsRoute = createSettingsRoute(state);
     const approvalsRoute = createApprovalsRoute(state);
     const auditRoute = createAuditRoute(state);
@@ -1467,6 +1471,11 @@ describe('OpenClaw ClawGuard plugin spike', () => {
         route: dashboardRoute,
         url: '/plugins/clawguard/dashboard',
         expectedHeading: 'ClawGuard dashboard',
+      },
+      {
+        route: checkupRoute,
+        url: '/plugins/clawguard/checkup',
+        expectedHeading: 'ClawGuard safety checkup',
       },
       {
         route: settingsRoute,
@@ -1512,6 +1521,26 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(dashboardHtmlResponse.body).toContain('Alpha install-demo only.');
     expect(dashboardHtmlResponse.body).toContain('fake-only approvals, audit, and settings surfaces');
     expect(dashboardHtmlResponse.body).toContain('should not be presented as broad outbound or workspace protection');
+    expect(dashboardHtmlResponse.body).toContain('Am I safe right now?');
+    expect(dashboardHtmlResponse.body).toContain('<strong>Urgent</strong>');
+    expect(dashboardHtmlResponse.body).toContain('<strong>1/4</strong> lightweight dashboard checks are passing.');
+    expect(dashboardHtmlResponse.body).toContain('Main drag right now:');
+    expect(dashboardHtmlResponse.body).toContain('Fix first:');
+    expect(dashboardHtmlResponse.body).toContain('Top attention items right now');
+    expect(dashboardHtmlResponse.body).toContain('Approval queue needs a decision');
+    expect(dashboardHtmlResponse.body).toContain('Checkup details');
+    expect(dashboardHtmlResponse.body).toContain(
+      'These posture items are read-only summaries built from the current approvals queue, recent audit trail, and install-demo metadata.',
+    );
+    expect(dashboardHtmlResponse.body).toContain('/plugins/clawguard/checkup');
+    expect(dashboardHtmlResponse.body).toContain('full safety checkup');
+    expect(dashboardHtmlResponse.body).toContain('id="checkup-approval-queue"');
+    expect(dashboardHtmlResponse.body).toContain('id="checkup-install-demo-posture"');
+    expect(dashboardHtmlResponse.body).toContain('Coverage remains install-demo only');
+    expect(dashboardHtmlResponse.body).toContain('There is no stock Control UI Security tab for this alpha');
+    expect(dashboardHtmlResponse.body).toContain('Quick actions');
+    expect(dashboardHtmlResponse.body).toContain('id="action-review-approvals"');
+    expect(dashboardHtmlResponse.body).toContain('id="action-review-demo-posture"');
     expect(dashboardHtmlResponse.body).toContain('Awaiting decision: <strong>1</strong>');
     expect(dashboardHtmlResponse.body).toContain('Live total: <strong>1</strong>');
     expect(dashboardHtmlResponse.body).toContain(pending.pending_action_id);
@@ -1531,12 +1560,161 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 
     expect(dashboardJsonResponse.statusCode).toBe(200);
     expect(dashboardJsonResponse.headers.get('content-type')).toBe('application/json; charset=utf-8');
-    expect(JSON.parse(dashboardJsonResponse.body)).toMatchObject({
+
+    type DashboardRecommendedAction = {
+      actionId: string;
+      label: string;
+      href: string;
+      summary: string;
+    };
+    type DashboardCheckupItem = {
+      id: string;
+      label: string;
+      explanation: string;
+      recommendedAction: DashboardRecommendedAction;
+      evidence: Record<string, unknown>;
+    };
+    type DashboardQuickAction = {
+      id: string;
+      title: string;
+      description: string;
+      href: string;
+      cta: string;
+      relatedCheckupItemIds: string[];
+    };
+    type DashboardSafetyStatus = {
+      label: string;
+      summary: string;
+      score: { passed: number; total: number };
+      checks: unknown[];
+    };
+    type DashboardMainDrag = {
+      label: string;
+      explanation: string;
+    };
+    type DashboardFirstFix = {
+      title: string;
+      why: string;
+      href: string;
+    };
+    type DashboardRoutePayload = {
+      safetyStatus: DashboardSafetyStatus;
+      checkup: {
+        items: DashboardCheckupItem[];
+        mainDrag: DashboardMainDrag;
+        firstFix: DashboardFirstFix;
+      };
+      quickActions: DashboardQuickAction[];
+      nextSteps: string[];
+    };
+    const dashboardPayload = JSON.parse(dashboardJsonResponse.body) as DashboardRoutePayload;
+    const recentAuditItems = state.audit.list().slice(0, 5);
+    const recentRiskSignals = recentAuditItems.filter((entry) =>
+      ['risk_hit', 'blocked', 'failed', 'invalid_transition', 'recovery_error', 'persistence_error'].includes(
+        entry.kind,
+      ),
+    ).length;
+    const recentAuditByKind = recentAuditItems.reduce<Record<string, number>>((summary, entry) => {
+      summary[entry.kind] = (summary[entry.kind] ?? 0) + 1;
+      return summary;
+    }, {});
+    const checkupItemsById = new Map<string, DashboardCheckupItem>(
+      dashboardPayload.checkup.items.map((item) => [item.id, item]),
+    );
+    const quickActionsById = new Map<string, DashboardQuickAction>(
+      dashboardPayload.quickActions.map((action) => [action.id, action]),
+    );
+
+    expect(dashboardPayload).toMatchObject({
+      safetyStatus: {
+        status: 'urgent',
+        label: 'Urgent',
+        summary:
+          'The dashboard sees at least one urgent drag item that should be fixed before calling this demo safe.',
+        explanation:
+          'Derived only from live approvals, approved actions waiting for retry, recent audit signals shown on this page, and explicit install-demo metadata.',
+        why:
+          'This status is driven by approval queue needs a decision, recent audit shows protective interventions, coverage remains install-demo only.',
+        mainDragItemId: 'approval-queue',
+        firstFixActionId: 'review-approvals',
+        score: {
+          passed: 1,
+          total: 4,
+        },
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'approval-queue',
+            label: 'Approval queue needs a decision',
+            status: 'urgent',
+            passed: false,
+            explanation: `1 live approval is still waiting for a human decision. Latest: ${pending.tool_name} — ${pending.reason_summary}.`,
+            recommendedAction: expect.objectContaining({
+              actionId: 'review-approvals',
+              label: 'Review 1 approval',
+              href: '/plugins/clawguard/approvals',
+            }),
+          }),
+          expect.objectContaining({
+            id: 'approved-retry-backlog',
+            label: 'Retry backlog is clear',
+            status: 'healthy',
+            passed: true,
+            explanation: 'No approved fake-only actions are waiting for their single retry.',
+          }),
+          expect.objectContaining({
+            id: 'recent-audit-signals',
+            label: 'Recent audit shows protective interventions',
+            status: 'needs_attention',
+            passed: false,
+            explanation: `The latest ${recentAuditItems.length} audit event(s) include ${recentRiskSignals} risk or block signals, so recent behavior still needs operator explanation.`,
+          }),
+          expect.objectContaining({
+            id: 'install-demo-posture',
+            label: 'Coverage remains install-demo only',
+            status: 'needs_attention',
+            passed: false,
+            explanation: expect.stringContaining('Alpha install-demo only. Unpublished and fake-only.'),
+          }),
+        ]),
+      },
+      checkup: {
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'approval-queue',
+            evidence: expect.objectContaining({
+              awaitingDecision: 1,
+              totalLive: 1,
+            }),
+          }),
+          expect.objectContaining({
+            id: 'install-demo-posture',
+            evidence: expect.objectContaining({
+              published: false,
+              smokePathCount: 5,
+            }),
+          }),
+        ]),
+        failingItemIds: ['approval-queue', 'recent-audit-signals', 'install-demo-posture'],
+        mainDrag: {
+          itemId: 'approval-queue',
+          label: 'Approval queue needs a decision',
+          status: 'urgent',
+          explanation: `1 live approval is still waiting for a human decision. Latest: ${pending.tool_name} — ${pending.reason_summary}.`,
+        },
+        firstFix: {
+          actionId: 'review-approvals',
+          title: 'Review pending approvals',
+          href: '/plugins/clawguard/approvals',
+          cta: 'Review 1 approval',
+          why: 'Resolve 1 pending approval before retrying any risky fake-only action.',
+        },
+      },
       pendingApprovals: {
         totalLive: 1,
         awaitingDecision: 1,
       },
       recentAudit: {
+        byKind: recentAuditByKind,
         items: expect.arrayContaining([
           expect.objectContaining({
             kind: 'pending_action_created',
@@ -1547,7 +1725,163 @@ describe('OpenClaw ClawGuard plugin spike', () => {
       settingsSummary: {
         approvalTtlSeconds: 120,
       },
+      topRisks: expect.arrayContaining([
+        expect.objectContaining({
+          checkupItemId: 'approval-queue',
+          actionId: 'review-approvals',
+          severity: 'urgent',
+          title: 'Approval queue needs a decision',
+          summary: `1 live approval is still waiting for a human decision. Latest: ${pending.tool_name} — ${pending.reason_summary}.`,
+          actionLabel: 'Review 1 approval',
+          href: '/plugins/clawguard/approvals',
+        }),
+        expect.objectContaining({
+          checkupItemId: 'recent-audit-signals',
+          actionId: 'inspect-audit-signals',
+          severity: 'needs_attention',
+          title: 'Recent audit shows protective interventions',
+          summary: `The latest ${recentAuditItems.length} audit event(s) include ${recentRiskSignals} risk or block signals, so recent behavior still needs operator explanation.`,
+          actionLabel: 'Open audit',
+          href: '/plugins/clawguard/audit',
+        }),
+        expect.objectContaining({
+          checkupItemId: 'install-demo-posture',
+          actionId: 'review-demo-posture',
+          severity: 'needs_attention',
+          title: 'Coverage remains install-demo only',
+          href: '/plugins/clawguard/settings',
+        }),
+      ]),
+      quickActions: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'review-approvals',
+          title: 'Review pending approvals',
+          description: 'Resolve 1 pending approval before retrying any risky fake-only action.',
+          cta: 'Review 1 approval',
+          href: '/plugins/clawguard/approvals',
+          relatedCheckupItemIds: ['approval-queue'],
+        }),
+        expect.objectContaining({
+          id: 'retry-approved-actions',
+          title: 'Check approved retry backlog',
+          description: `No approved fake-only actions are waiting right now, but the approvals page is where the single-retry backlog would appear inside the ${state.config.approvalTtlSeconds}s TTL.`,
+          cta: 'Open approvals',
+          href: '/plugins/clawguard/approvals',
+          relatedCheckupItemIds: ['approved-retry-backlog'],
+        }),
+        expect.objectContaining({
+          id: 'inspect-audit-signals',
+          title: 'Inspect recent protective events',
+          description: `The latest ${recentAuditItems.length} audit event(s) include ${recentRiskSignals} risk or error signals. Use the audit page to explain what ClawGuard blocked, queued, or failed.`,
+          cta: 'Open audit',
+          href: '/plugins/clawguard/audit',
+          relatedCheckupItemIds: ['recent-audit-signals'],
+        }),
+        expect.objectContaining({
+          id: 'review-demo-posture',
+          title: 'Confirm alpha limits and guardrails',
+          description: `Check the live TTL (${state.config.approvalTtlSeconds}s), pending limit (${state.config.pendingActionLimit}), allow-once limit (${state.config.allowOnceGrantLimit}), and install-demo posture before any walkthrough.`,
+          cta: 'Open settings',
+          href: '/plugins/clawguard/settings',
+          relatedCheckupItemIds: ['install-demo-posture'],
+        }),
+      ]),
     });
+    expect(dashboardPayload.checkup.items).toHaveLength(4);
+    expect(dashboardPayload.safetyStatus.checks).toHaveLength(dashboardPayload.checkup.items.length);
+    for (const item of dashboardPayload.checkup.items) {
+      const action = quickActionsById.get(item.recommendedAction.actionId);
+      expect(action).toBeDefined();
+      if (!action) {
+        throw new Error(`Missing quick action for checkup item ${item.id}`);
+      }
+      expect(item.recommendedAction).toMatchObject({
+        actionId: action.id,
+        label: action.cta,
+        href: action.href,
+        summary: action.description,
+      });
+      expect(action.relatedCheckupItemIds).toContain(item.id);
+      expect(dashboardHtmlResponse.body).toContain(`id="checkup-${item.id}"`);
+      expect(dashboardHtmlResponse.body).toContain(`id="action-${action.id}"`);
+    }
+    for (const action of dashboardPayload.quickActions) {
+      for (const relatedCheckupItemId of action.relatedCheckupItemIds) {
+        const item = checkupItemsById.get(relatedCheckupItemId);
+        expect(item).toBeDefined();
+        if (!item) {
+          throw new Error(`Missing checkup item for quick action ${action.id}`);
+        }
+        expect(item.recommendedAction.actionId).toBe(action.id);
+      }
+    }
+    expect(dashboardPayload.nextSteps).toEqual(
+      dashboardPayload.quickActions.map(
+        (action: { title: string; description: string; href: string }) =>
+          `${action.title}: ${action.description} (${action.href})`,
+      ),
+    );
+
+    const checkupHtmlResponse = createMockResponse();
+    checkupRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/checkup',
+      } as never,
+      checkupHtmlResponse as never,
+    );
+
+    expect(checkupHtmlResponse.statusCode).toBe(200);
+    expect(checkupHtmlResponse.body).toContain('ClawGuard safety checkup');
+    expect(checkupHtmlResponse.body).toContain('install-demo only, unpublished, fake-only, and plugin-owned');
+    expect(checkupHtmlResponse.body).toContain('does not imply a stock Control UI Security tab');
+    expect(checkupHtmlResponse.body).toContain('/plugins/clawguard/dashboard');
+    expect(checkupHtmlResponse.body).toContain('Top status summary');
+    expect(checkupHtmlResponse.body).toContain('Main drag and fix first');
+    expect(checkupHtmlResponse.body).toContain('All checkup items');
+    expect(checkupHtmlResponse.body).toContain('Evidence available right now');
+    expect(checkupHtmlResponse.body).toContain('Quick follow-up actions');
+    expect(checkupHtmlResponse.body).toContain(`<strong>${dashboardPayload.safetyStatus.label}</strong>`);
+    expect(checkupHtmlResponse.body).toContain(dashboardPayload.safetyStatus.summary);
+    expect(checkupHtmlResponse.body).toContain(
+      `<strong>${dashboardPayload.safetyStatus.score.passed}/${dashboardPayload.safetyStatus.score.total}</strong> posture checks are currently passing.`,
+    );
+    expect(checkupHtmlResponse.body).toContain(dashboardPayload.checkup.mainDrag.label);
+    expect(checkupHtmlResponse.body).toContain(dashboardPayload.checkup.mainDrag.explanation);
+    expect(checkupHtmlResponse.body).toContain(dashboardPayload.checkup.firstFix.title);
+    expect(checkupHtmlResponse.body).toContain(dashboardPayload.checkup.firstFix.why);
+    expect(checkupHtmlResponse.body).toContain(dashboardPayload.checkup.firstFix.href);
+    for (const item of dashboardPayload.checkup.items) {
+      expect(checkupHtmlResponse.body).toContain(`id="checkup-${item.id}"`);
+      expect(checkupHtmlResponse.body).toContain(item.label);
+      expect(checkupHtmlResponse.body).toContain(item.explanation);
+      expect(checkupHtmlResponse.body).toContain(item.recommendedAction.label);
+      expect(checkupHtmlResponse.body).toContain(item.recommendedAction.href);
+    }
+    for (const action of dashboardPayload.quickActions) {
+      expect(checkupHtmlResponse.body).toContain(`id="action-${action.id}"`);
+      expect(checkupHtmlResponse.body).toContain(action.title);
+      expect(checkupHtmlResponse.body).toContain(action.description);
+      expect(checkupHtmlResponse.body).toContain(action.cta);
+      expect(checkupHtmlResponse.body).toContain(action.href);
+    }
+
+    const checkupJsonResponse = createMockResponse();
+    checkupRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/checkup?format=json',
+      } as never,
+      checkupJsonResponse as never,
+    );
+
+    expect(checkupJsonResponse.statusCode).toBe(200);
+    expect(checkupJsonResponse.headers.get('content-type')).toBe('application/json; charset=utf-8');
+    const checkupPayload = JSON.parse(checkupJsonResponse.body) as DashboardRoutePayload;
+    expect(checkupPayload.safetyStatus).toEqual(dashboardPayload.safetyStatus);
+    expect(checkupPayload.checkup).toEqual(dashboardPayload.checkup);
+    expect(checkupPayload.quickActions).toEqual(dashboardPayload.quickActions);
+    expect(checkupPayload.nextSteps).toEqual(dashboardPayload.nextSteps);
 
     const auditHtmlResponse = createMockResponse();
     auditRoute(
@@ -1748,6 +2082,9 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     const auditRoute = registry.httpRoutes.find(
       (entry) => entry.pluginId === 'clawguard' && entry.path === '/plugins/clawguard/audit',
     );
+    const checkupRoute = registry.httpRoutes.find(
+      (entry) => entry.pluginId === 'clawguard' && entry.path === '/plugins/clawguard/checkup',
+    );
     const dashboardRoute = registry.httpRoutes.find(
       (entry) => entry.pluginId === 'clawguard' && entry.path === '/plugins/clawguard/dashboard',
     );
@@ -1757,6 +2094,8 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 
     expect(dashboardRoute?.auth).toBe('gateway');
     expect(dashboardRoute?.match).toBe('exact');
+    expect(checkupRoute?.auth).toBe('gateway');
+    expect(checkupRoute?.match).toBe('exact');
     expect(approvalsRoute?.auth).toBe('gateway');
     expect(approvalsRoute?.match).toBe('prefix');
     expect(auditRoute?.auth).toBe('gateway');
