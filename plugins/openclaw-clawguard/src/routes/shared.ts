@@ -1,3 +1,4 @@
+import type { AuditEntry } from '../types.js';
 import { escapeHtml } from '../utils.js';
 import type { LivePendingActionStatus } from '../types.js';
 
@@ -74,12 +75,21 @@ export interface ControlSurfaceLanePressure {
 }
 
 export type OutboundRouteMode = 'explicit' | 'implicit';
+export type RecentAuditOrigin = 'Approvals queue' | 'Direct host outbound' | 'Direct audit trail';
 
 export interface RecentAuditQuickScan {
   readonly workspaceResultState?: string;
   readonly workspaceResultCue?: string;
   readonly outboundRouteMode?: OutboundRouteMode;
   readonly outboundRoute?: string;
+}
+
+export interface RecentAuditLatestSignals {
+  readonly latestOutboundRoute?: string;
+  readonly latestOutboundRouteMode?: OutboundRouteMode;
+  readonly latestOutboundOrigin?: RecentAuditOrigin;
+  readonly latestWorkspaceResultState?: string;
+  readonly latestWorkspaceResultCue?: string;
 }
 
 export type ControlSurfaceHandoffMode = 'dashboard' | 'checkup';
@@ -118,6 +128,14 @@ const WORKSPACE_RESULT_STATE_PATTERN = /workspace result state=([^;]+?)(?:;|$)/i
 const WORKSPACE_RESULT_CUE_MARKER = 'workspace result state=';
 const OUTBOUND_ROUTE_MODE_PATTERN = /Route mode=([^.;]+?)(?=\.|$)/i;
 const OUTBOUND_ROUTE_PATTERN = /Outbound route=([\s\S]*?)(?=\. [A-Z]|\. $|$)/i;
+const APPROVAL_TRAIL_KINDS: ReadonlySet<AuditEntry['kind']> = new Set([
+  'pending_action_created',
+  'approved',
+  'denied',
+  'allow_once_issued',
+  'allow_once_revoked',
+  'allow_once_consumed',
+]);
 
 const CONTROL_SURFACE_POSTURE =
   'Alpha control surface only. Plugin-owned, install-demo only, unpublished, fake-only, and not a stock Control UI Security tab.';
@@ -372,54 +390,78 @@ function extractAuditDetail(detail: string | undefined, pattern: RegExp): string
 }
 
 export function buildRecentAuditQuickScan(
-  entries: ReadonlyArray<{ readonly detail: string }>,
+  entries: ReadonlyArray<AuditEntry>,
 ): RecentAuditQuickScan {
-  const details = [...entries].map((entry) => entry.detail);
-  const latestWorkspaceDetail = details.find((detail) => WORKSPACE_RESULT_STATE_PATTERN.test(detail));
-  const latestOutboundDetail = details.find(
-    (detail) => OUTBOUND_ROUTE_MODE_PATTERN.test(detail) || OUTBOUND_ROUTE_PATTERN.test(detail),
-  );
+  const latestSignals = buildRecentAuditLatestSignals(entries);
 
-  const quickScan: {
-    workspaceResultState?: string;
-    workspaceResultCue?: string;
-    outboundRouteMode?: OutboundRouteMode;
-    outboundRoute?: string;
-  } = {};
-  const workspaceResultCue = latestWorkspaceDetail
-    ? readWorkspaceResultCueFromDetail(latestWorkspaceDetail)
+  return {
+    ...(latestSignals.latestWorkspaceResultCue
+      ? { workspaceResultCue: latestSignals.latestWorkspaceResultCue, workspaceResultState: latestSignals.latestWorkspaceResultCue }
+      : latestSignals.latestWorkspaceResultState
+        ? { workspaceResultState: latestSignals.latestWorkspaceResultState }
+        : {}),
+    ...(latestSignals.latestOutboundRouteMode ? { outboundRouteMode: latestSignals.latestOutboundRouteMode } : {}),
+    ...(latestSignals.latestOutboundRoute ? { outboundRoute: latestSignals.latestOutboundRoute } : {}),
+  };
+}
+
+export function buildRecentAuditLatestSignals(
+  entries: ReadonlyArray<AuditEntry>,
+): RecentAuditLatestSignals {
+  const latestWorkspaceEntry = entries.find((entry) => WORKSPACE_RESULT_STATE_PATTERN.test(entry.detail));
+  const latestOutboundEntry = entries.find(
+    (entry) => OUTBOUND_ROUTE_MODE_PATTERN.test(entry.detail) || OUTBOUND_ROUTE_PATTERN.test(entry.detail),
+  );
+  const latestWorkspaceResultCue = latestWorkspaceEntry
+    ? readWorkspaceResultCueFromDetail(latestWorkspaceEntry.detail)
     : undefined;
-  const workspaceResultState = latestWorkspaceDetail
-    ? readWorkspaceResultStateFromDetail(latestWorkspaceDetail)
+  const latestWorkspaceResultState = latestWorkspaceEntry
+    ? readWorkspaceResultStateFromDetail(latestWorkspaceEntry.detail)
     : undefined;
-  const outboundRouteModeCandidate = extractAuditDetail(
-    latestOutboundDetail,
+  const latestOutboundRouteModeCandidate = extractAuditDetail(
+    latestOutboundEntry?.detail,
     OUTBOUND_ROUTE_MODE_PATTERN,
   );
-  const outboundRouteMode =
-    outboundRouteModeCandidate === 'explicit' || outboundRouteModeCandidate === 'implicit'
-      ? outboundRouteModeCandidate
+  const latestOutboundRouteMode =
+    latestOutboundRouteModeCandidate === 'explicit' || latestOutboundRouteModeCandidate === 'implicit'
+      ? latestOutboundRouteModeCandidate
       : undefined;
-  const outboundRoute = latestOutboundDetail
-    ? extractAuditDetail(latestOutboundDetail, OUTBOUND_ROUTE_PATTERN)
+  const latestOutboundRoute = latestOutboundEntry
+    ? extractAuditDetail(latestOutboundEntry.detail, OUTBOUND_ROUTE_PATTERN)
     : undefined;
 
-  if (workspaceResultCue) {
-    quickScan.workspaceResultCue = workspaceResultCue;
-    quickScan.workspaceResultState = workspaceResultCue;
-  } else if (workspaceResultState) {
-    quickScan.workspaceResultState = workspaceResultState;
+  const latestOutboundOrigin = latestOutboundEntry
+    ? inferRecentAuditOrigin(latestOutboundEntry)
+    : undefined;
+
+  return {
+    ...(latestOutboundRoute ? { latestOutboundRoute } : {}),
+    ...(latestOutboundRouteMode ? { latestOutboundRouteMode } : {}),
+    ...(latestOutboundOrigin ? { latestOutboundOrigin } : {}),
+    ...(latestWorkspaceResultState ? { latestWorkspaceResultState } : {}),
+    ...(latestWorkspaceResultCue ? { latestWorkspaceResultCue } : {}),
+  };
+}
+
+function inferRecentAuditOrigin(entry: AuditEntry): RecentAuditOrigin | undefined {
+  if (entry.tool_name === 'message_sending') {
+    return 'Direct host outbound';
   }
 
-  if (outboundRouteMode) {
-    quickScan.outboundRouteMode = outboundRouteMode;
+  if (
+    APPROVAL_TRAIL_KINDS.has(entry.kind) ||
+    entry.tool_name === 'message' ||
+    entry.tool_name === 'sessions_send' ||
+    typeof entry.pending_action_id === 'string'
+  ) {
+    return 'Approvals queue';
   }
 
-  if (outboundRoute) {
-    quickScan.outboundRoute = outboundRoute;
+  if (readOutboundRouteMode(entry.detail) || readOutboundRouteFromDetail(entry.detail)) {
+    return 'Direct audit trail';
   }
 
-  return quickScan;
+  return undefined;
 }
 
 export function summarizeControlSurfaceDomains(

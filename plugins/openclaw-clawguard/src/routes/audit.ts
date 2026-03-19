@@ -8,6 +8,7 @@ import {
   CHECKUP_ROUTE_PATH,
   DASHBOARD_ROUTE_PATH,
   INSTALL_DEMO,
+  buildRecentAuditLatestSignals,
   readOutboundRouteFromDetail,
   readOutboundRouteMode,
   readWorkspaceResultCueFromDetail,
@@ -17,6 +18,7 @@ import {
   renderClawGuardNav,
   renderControlSurfaceIntro,
   renderInstallDemoPostureNote,
+  type RecentAuditOrigin,
 } from './shared.js';
 
 type AuditKindGuide = {
@@ -105,6 +107,7 @@ type AuditTimelinePayload = {
     readonly latest?: {
       readonly latestOutboundRoute?: string;
       readonly latestOutboundRouteMode?: RouteMode;
+      readonly latestOutboundOrigin?: RecentAuditOrigin;
       readonly latestWorkspaceResultState?: string;
       readonly latestWorkspaceResultCue?: string;
     };
@@ -252,11 +255,7 @@ const AUDIT_KIND_GUIDE: Record<AuditEntryKind, AuditKindGuide> = {
 function buildAuditPayload(state: ClawGuardState): AuditTimelinePayload {
   const audit = state.audit.list();
   const flows = buildTimelineFlows(audit);
-  const latestOutboundRoute = findLatestOutboundRoute(flows);
-  const latestOutboundRouteMode = findLatestOutboundRouteMode(flows);
-  const latestOutboundOrigin = findLatestOutboundOrigin(flows);
-  const latestWorkspaceResultState = findLatestWorkspaceResultState(flows);
-  const latestWorkspaceResultCue = findLatestWorkspaceResultCue(flows);
+  const latestSignals = buildRecentAuditLatestSignals(audit);
   const flowOutcomes = flows.reduce(
     (summary, flow) => {
       if (flow.origin === 'Approvals queue') {
@@ -322,18 +321,18 @@ function buildAuditPayload(state: ClawGuardState): AuditTimelinePayload {
           ...guide,
         }),
       ),
-      ...(latestOutboundRoute ||
-      latestOutboundRouteMode ||
-      latestOutboundOrigin ||
-      latestWorkspaceResultState ||
-      latestWorkspaceResultCue
+      ...(latestSignals.latestOutboundRoute ||
+      latestSignals.latestOutboundRouteMode ||
+      latestSignals.latestOutboundOrigin ||
+      latestSignals.latestWorkspaceResultState ||
+      latestSignals.latestWorkspaceResultCue
         ? {
             latest: {
-              ...(latestOutboundRoute ? { latestOutboundRoute } : {}),
-              ...(latestOutboundRouteMode ? { latestOutboundRouteMode } : {}),
-              ...(latestOutboundOrigin ? { latestOutboundOrigin } : {}),
-              ...(latestWorkspaceResultState ? { latestWorkspaceResultState } : {}),
-              ...(latestWorkspaceResultCue ? { latestWorkspaceResultCue } : {}),
+              ...(latestSignals.latestOutboundRoute ? { latestOutboundRoute: latestSignals.latestOutboundRoute } : {}),
+              ...(latestSignals.latestOutboundRouteMode ? { latestOutboundRouteMode: latestSignals.latestOutboundRouteMode } : {}),
+              ...(latestSignals.latestOutboundOrigin ? { latestOutboundOrigin: latestSignals.latestOutboundOrigin } : {}),
+              ...(latestSignals.latestWorkspaceResultState ? { latestWorkspaceResultState: latestSignals.latestWorkspaceResultState } : {}),
+              ...(latestSignals.latestWorkspaceResultCue ? { latestWorkspaceResultCue: latestSignals.latestWorkspaceResultCue } : {}),
             },
           }
         : {}),
@@ -458,62 +457,6 @@ function summarizeFlowOutboundRoute(entries: AuditEntry[]): string | undefined {
     const outboundRoute = readOutboundRouteFromDetail(entry.detail);
     if (outboundRoute) {
       return outboundRoute;
-    }
-  }
-
-  return undefined;
-}
-
-function findLatestOutboundRoute(flows: TimelineFlow[]): string | undefined {
-  for (const flow of flows) {
-    if (flow.outboundRoute) {
-      return flow.outboundRoute;
-    }
-  }
-
-  return undefined;
-}
-
-function findLatestOutboundRouteMode(flows: TimelineFlow[]): RouteMode | undefined {
-  for (const flow of flows) {
-    if (flow.routeMode) {
-      return flow.routeMode;
-    }
-  }
-
-  return undefined;
-}
-
-function findLatestOutboundOrigin(flows: TimelineFlow[]): string | undefined {
-  for (const flow of flows) {
-    if ((flow.outboundRoute || flow.routeMode) && flow.origin !== 'Direct audit trail') {
-      return flow.origin;
-    }
-  }
-
-  for (const flow of flows) {
-    if (flow.outboundRoute || flow.routeMode) {
-      return flow.origin;
-    }
-  }
-
-  return undefined;
-}
-
-function findLatestWorkspaceResultState(flows: TimelineFlow[]): string | undefined {
-  for (const flow of flows) {
-    if (flow.workspaceState) {
-      return flow.workspaceState;
-    }
-  }
-
-  return undefined;
-}
-
-function findLatestWorkspaceResultCue(flows: TimelineFlow[]): string | undefined {
-  for (const flow of flows) {
-    if (flow.workspaceResultCue) {
-      return flow.workspaceResultCue;
     }
   }
 
@@ -696,11 +639,7 @@ function formatTimestamp(value: string): string {
 }
 
 function renderAuditPage(payload: AuditTimelinePayload): string {
-  const latestOutboundRoute = findLatestOutboundRoute(payload.timeline.flows);
-  const latestOutboundRouteMode = findLatestOutboundRouteMode(payload.timeline.flows);
-  const latestOutboundOrigin = findLatestOutboundOrigin(payload.timeline.flows);
-  const latestWorkspaceResultState = findLatestWorkspaceResultState(payload.timeline.flows);
-  const latestWorkspaceResultCue = findLatestWorkspaceResultCue(payload.timeline.flows);
+  const latest = payload.timeline.latest;
   const flowCards = payload.timeline.flows
     .map(
       (flow) => `
@@ -832,11 +771,11 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
     <section class="hero">
       <p>Replay the fake-only audit entries ClawGuard already captured. Dashboard is the status view, Checkup is the explanation view, Approvals is the action view, and Audit reconstructs what actually happened over time.</p>
       <p>${renderAuditLiveQueueHintCopy()}</p>
-      ${latestOutboundRoute ? `<p><strong>Latest outbound route in recent replay:</strong> ${escapeHtml(latestOutboundRoute)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
-      ${latestOutboundRouteMode ? `<p><strong>Latest outbound route mode in recent replay:</strong> ${escapeHtml(latestOutboundRouteMode)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
-      ${latestOutboundOrigin ? `<p><strong>Latest outbound origin in recent replay:</strong> ${escapeHtml(latestOutboundOrigin)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
-      ${latestWorkspaceResultCue ? `<p><strong>Latest workspace result cue in recent replay:</strong> ${escapeHtml(latestWorkspaceResultCue)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
-      ${latestWorkspaceResultState ? `<p><strong>Latest workspace result state in recent replay:</strong> ${escapeHtml(latestWorkspaceResultState)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latest?.latestOutboundRoute ? `<p><strong>Latest outbound route in recent replay:</strong> ${escapeHtml(latest.latestOutboundRoute)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latest?.latestOutboundRouteMode ? `<p><strong>Latest outbound route mode in recent replay:</strong> ${escapeHtml(latest.latestOutboundRouteMode)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latest?.latestOutboundOrigin ? `<p><strong>Latest outbound origin in recent replay:</strong> ${escapeHtml(latest.latestOutboundOrigin)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latest?.latestWorkspaceResultCue ? `<p><strong>Latest workspace result cue in recent replay:</strong> ${escapeHtml(latest.latestWorkspaceResultCue)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latest?.latestWorkspaceResultState ? `<p><strong>Latest workspace result state in recent replay:</strong> ${escapeHtml(latest.latestWorkspaceResultState)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       <p><strong>Current posture:</strong> ${escapeHtml(INSTALL_DEMO.demoPosture)}</p>
       <p><strong>Navigation posture:</strong> ${escapeHtml(INSTALL_DEMO.navigationPosture)}</p>
     </section>

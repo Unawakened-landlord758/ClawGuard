@@ -59,6 +59,7 @@ export interface ToolResultSnapshot extends ToolContextSnapshot {
 
 interface TrackedToolExecution {
   readonly pending_action_id?: string;
+  readonly lookup_key: string;
   readonly action_fingerprint: string;
   readonly artifacts: EvaluationArtifacts | ApprovalIntegratedArtifacts;
 }
@@ -163,7 +164,12 @@ export class ClawGuardState {
     }
 
     if (artifacts.policy_decision.decision !== ResponseAction.ApproveRequired) {
-      this.trackExecution(correlationKey, actionFingerprint, artifacts);
+      this.trackExecution(
+        correlationKey,
+        buildExecutionLookupKey(input, toolName),
+        actionFingerprint,
+        artifacts,
+      );
       return { block: false };
     }
 
@@ -189,6 +195,7 @@ export class ClawGuardState {
       });
       this.trackExecution(
         correlationKey,
+        buildExecutionLookupKey(input, toolName),
         actionFingerprint,
         approvalIntegrated,
         grantResult.grant.pending_action_id,
@@ -357,19 +364,22 @@ export class ClawGuardState {
       params: input.params,
     });
     const correlationKey = buildExecutionCorrelationKey(input, toolName, actionFingerprint);
-    const tracked = this.trackedExecutions.get(correlationKey);
-    if (!tracked) {
+    const lookupKey = buildExecutionLookupKey(input, toolName);
+    const match = findTrackedExecution(this.trackedExecutions, correlationKey, lookupKey, {
+      allowRelaxedWorkspaceFallback: options.acceptedPipelines.includes(PipelineKind.WorkspaceMutation),
+    });
+    if (!match) {
       return;
     }
 
-    if (!options.acceptedPipelines.includes(tracked.artifacts.routing.pipeline_kind)) {
+    if (!options.acceptedPipelines.includes(match.tracked.artifacts.routing.pipeline_kind)) {
       return;
     }
 
-    this.trackedExecutions.delete(correlationKey);
+    this.trackedExecutions.delete(match.tracking_key);
 
     const resultSummary = buildAfterSummary(input);
-    const integrated = applyPostExecutionResultToEvaluationArtifacts(tracked.artifacts, {
+    const integrated = applyPostExecutionResultToEvaluationArtifacts(match.tracked.artifacts, {
       tool_status: deriveAfterToolStatus(input),
       timestamp: toIsoString(this.clock.now()),
       summary: resultSummary,
@@ -386,8 +396,8 @@ export class ClawGuardState {
       run_id: integrated.run_ref.run_id,
       tool_call_id: integrated.tool_call_ref.tool_call_id,
       tool_name: integrated.tool_call_ref.tool_name,
-      pending_action_id: tracked.pending_action_id,
-      action_fingerprint: tracked.action_fingerprint,
+      pending_action_id: match.tracked.pending_action_id,
+      action_fingerprint: match.tracked.action_fingerprint,
     });
   }
 
@@ -451,12 +461,14 @@ export class ClawGuardState {
 
   private trackExecution(
     correlationKey: string,
+    lookupKey: string,
     actionFingerprint: string,
     artifacts: EvaluationArtifacts | ApprovalIntegratedArtifacts,
     pendingActionId?: string,
   ): void {
     this.trackedExecutions.set(correlationKey, {
       pending_action_id: pendingActionId,
+      lookup_key: lookupKey,
       action_fingerprint: actionFingerprint,
       artifacts,
     });
@@ -600,6 +612,44 @@ function buildExecutionCorrelationKey(
     toolName,
     actionFingerprint,
   ].join('|');
+}
+
+function buildExecutionLookupKey(input: ToolContextSnapshot, toolName: string): string {
+  return [
+    input.sessionKey ?? 'session-unknown',
+    input.runId ?? 'run-unknown',
+    input.toolCallId ?? 'toolcall-unknown',
+    toolName,
+  ].join('|');
+}
+
+function findTrackedExecution(
+  trackedExecutions: ReadonlyMap<string, TrackedToolExecution>,
+  strictKey: string,
+  relaxedKey: string,
+  options?: {
+    readonly allowRelaxedWorkspaceFallback?: boolean;
+  },
+): { readonly tracking_key: string; readonly tracked: TrackedToolExecution } | undefined {
+  const strictMatch = trackedExecutions.get(strictKey);
+  if (strictMatch) {
+    return { tracking_key: strictKey, tracked: strictMatch };
+  }
+
+  if (!options?.allowRelaxedWorkspaceFallback) {
+    return undefined;
+  }
+
+  for (const [trackingKey, tracked] of trackedExecutions.entries()) {
+    if (
+      tracked.lookup_key === relaxedKey &&
+      tracked.artifacts.routing.pipeline_kind === PipelineKind.WorkspaceMutation
+    ) {
+      return { tracking_key: trackingKey, tracked };
+    }
+  }
+
+  return undefined;
 }
 
 function buildImpactScope(artifacts: EvaluationArtifacts): string | undefined {

@@ -1949,6 +1949,38 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(auditHtmlResponse.body).toContain('write replay (insert)');
   });
 
+  it('closes a workspace replay through tool_result_persist even when the host trims mutation params', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        toolName: event.toolName,
+        params: {
+          path: 'src\\generated\\feature-flags.ts',
+        },
+        runId: event.runId,
+        toolCallId: event.toolCallId,
+        result: {
+          status: 'completed',
+          created: ['src\\generated\\feature-flags.ts'],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=insert via created',
+    );
+  });
+
   it('keeps exec finalization on after_tool_call even when tool_result_persist fires', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
@@ -2586,6 +2618,51 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
     expect(auditPayload.timeline.latest).toMatchObject({
       latestOutboundOrigin: 'Direct host outbound',
+    });
+  });
+
+  it('anchors the latest outbound origin to the latest outbound replay instead of an older lane', () => {
+    const state = createClawGuardState();
+    const auditRoute = createAuditRoute(state);
+
+    state.audit.record({
+      kind: 'blocked',
+      detail: 'Blocked host outbound delivery before channel send. Outbound route=C123 via slack/default/C123. Route mode=explicit.',
+      tool_name: 'message_sending',
+      run_id: 'run-host-older',
+      tool_call_id: 'tool-host-older',
+    });
+    state.audit.record({
+      kind: 'pending_action_created',
+      detail: 'Blocked before execution and queued pending-outbound-new. Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token. Route mode=explicit.',
+      tool_name: 'message',
+      pending_action_id: 'pending-outbound-new',
+      run_id: 'run-outbound-new',
+      tool_call_id: 'tool-outbound-new',
+    });
+
+    const auditJsonResponse = createMockResponse();
+    auditRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/audit?format=json',
+      } as never,
+      auditJsonResponse as never,
+    );
+
+    expect(auditJsonResponse.statusCode).toBe(200);
+    const auditPayload = JSON.parse(auditJsonResponse.body) as {
+      timeline: {
+        latest?: {
+          latestOutboundOrigin?: string;
+          latestOutboundRoute?: string;
+        };
+      };
+    };
+    expect(auditPayload.timeline.latest).toMatchObject({
+      latestOutboundOrigin: 'Approvals queue',
+      latestOutboundRoute:
+        'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
     });
   });
 
