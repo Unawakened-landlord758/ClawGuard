@@ -1659,6 +1659,47 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('keeps the quick scan conservative when recent outbound route is unavailable', () => {
+    const state = createClawGuardState();
+    state.audit.record({
+      kind: 'blocked',
+      detail: 'Workspace result state=modify via updated; Route mode=implicit. No route detail yet.',
+      tool_name: 'sessions_send',
+    });
+    const dashboardRoute = createDashboardRoute(state);
+    const checkupRoute = createCheckupRoute(state);
+
+    const dashboardHtmlResponse = createMockResponse();
+    dashboardRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/dashboard',
+      } as never,
+      dashboardHtmlResponse as never,
+    );
+
+    expect(dashboardHtmlResponse.statusCode).toBe(200);
+    expect(dashboardHtmlResponse.body).toContain('Recent audit quick scan:');
+    expect(dashboardHtmlResponse.body).toContain('Workspace result state:</strong> modify via updated');
+    expect(dashboardHtmlResponse.body).toContain('Outbound route mode:</strong> implicit');
+    expect(dashboardHtmlResponse.body).not.toContain('Outbound route:</strong>');
+
+    const checkupHtmlResponse = createMockResponse();
+    checkupRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/checkup',
+      } as never,
+      checkupHtmlResponse as never,
+    );
+
+    expect(checkupHtmlResponse.statusCode).toBe(200);
+    expect(checkupHtmlResponse.body).toContain('Recent audit quick scan:');
+    expect(checkupHtmlResponse.body).toContain('Workspace result state:</strong> modify via updated');
+    expect(checkupHtmlResponse.body).toContain('Outbound route mode:</strong> implicit');
+    expect(checkupHtmlResponse.body).not.toContain('Outbound route:</strong>');
+  });
+
   it('explains host-level direct outbound as an audit-only lane in the replay view', () => {
     const state = createClawGuardState();
     const sendingHandler = createMessageSendingHandler(state);
