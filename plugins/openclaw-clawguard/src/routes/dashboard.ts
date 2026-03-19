@@ -8,6 +8,7 @@ import {
   CHECKUP_ROUTE_PATH,
   DASHBOARD_ROUTE_PATH,
   SETTINGS_ROUTE_PATH,
+  buildRecentAuditQuickScan,
   createOperatorQuickAction,
   createRecommendedOperatorAction,
   renderClawGuardNav,
@@ -21,6 +22,8 @@ import {
   summarizeControlSurfaceDomains,
   summarizeControlSurfaceLanePressure,
   INSTALL_DEMO,
+  readOutboundRouteMode,
+  type RecentAuditQuickScan,
 } from './shared.js';
 
 const PENDING_OVERVIEW_LIMIT = 5;
@@ -38,20 +41,6 @@ const CHECKUP_STATUS_ORDER = {
   needs_attention: 2,
   healthy: 1,
 } as const;
-const WORKSPACE_RESULT_STATE_PATTERN = /workspace result state=([^;]+?)(?:;|$)/i;
-const WORKSPACE_RESULT_CUE_MARKER = 'workspace result state=';
-const OUTBOUND_ROUTE_MODE_PATTERN = /Route mode=([^.;]+?)(?=\.|$)/i;
-const OUTBOUND_ROUTE_PATTERN = /Outbound route=([\s\S]*?)(?=\. [A-Z]|\. $|$)/i;
-type RecentAuditQuickScan = {
-  workspaceResultState?: string;
-  workspaceResultCue?: string;
-  outboundRouteMode?: 'explicit' | 'implicit';
-  outboundRoute?: string;
-};
-
-function trimTrailingPunctuation(value: string): string {
-  return value.trim().replace(/[.;,]+$/u, '');
-}
 const RECENT_ERROR_KINDS: AuditEntry['kind'][] = [
   'failed',
   'invalid_transition',
@@ -127,20 +116,9 @@ function readPendingOutboundRouteMode(entry: PendingAction): 'explicit' | 'impli
   ];
 
   for (const candidate of candidates) {
-    if (!candidate) {
-      continue;
-    }
-
-    const textualMatch = candidate.match(/\bRoute mode(?:=|:)\s*(explicit|implicit)\b/i);
-    if (textualMatch?.[1]) {
-      const routeMode = textualMatch[1].toLowerCase();
-      return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
-    }
-
-    const titleMatch = candidate.match(/\((explicit|implicit) route\)/i);
-    if (titleMatch?.[1]) {
-      const routeMode = titleMatch[1].toLowerCase();
-      return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
+    const routeMode = readOutboundRouteMode(candidate);
+    if (routeMode) {
+      return routeMode;
     }
   }
 
@@ -192,64 +170,6 @@ function renderAuditItem(entry: AuditEntry): string {
     <br />
     <small>${escapeHtml(entry.timestamp)}${entry.tool_name ? ` · Tool: ${escapeHtml(entry.tool_name)}` : ''}</small>
   </li>`;
-}
-
-function findLatestAuditEntry(
-  entries: AuditEntry[],
-  predicate: (entry: AuditEntry) => boolean,
-): AuditEntry | undefined {
-  return entries.find(predicate);
-}
-
-function extractAuditDetail(entry: AuditEntry | undefined, pattern: RegExp): string | undefined {
-  if (!entry) {
-    return undefined;
-  }
-
-  const match = entry.detail.match(pattern);
-  return match?.[1] ? trimTrailingPunctuation(match[1]) : undefined;
-}
-
-function readWorkspaceResultCueFromDetail(detail: string): string | undefined {
-  const startIndex = detail.toLowerCase().indexOf(WORKSPACE_RESULT_CUE_MARKER);
-  if (startIndex < 0) {
-    return undefined;
-  }
-
-  const remainder = detail.slice(startIndex + WORKSPACE_RESULT_CUE_MARKER.length);
-  const cue = remainder.split(';', 1)[0]?.trim();
-  return cue && cue.length > 0 ? cue : undefined;
-}
-
-function buildRecentAuditQuickScan(entries: AuditEntry[]): RecentAuditQuickScan {
-  const latestWorkspaceEntry = findLatestAuditEntry(entries, (entry) =>
-    WORKSPACE_RESULT_STATE_PATTERN.test(entry.detail),
-  );
-  const latestOutboundEntry = findLatestAuditEntry(entries, (entry) =>
-    OUTBOUND_ROUTE_MODE_PATTERN.test(entry.detail) || OUTBOUND_ROUTE_PATTERN.test(entry.detail),
-  );
-
-  const quickScan: RecentAuditQuickScan = {};
-  const workspaceResultCue = latestWorkspaceEntry
-    ? readWorkspaceResultCueFromDetail(latestWorkspaceEntry.detail)
-    : undefined;
-  const outboundRouteMode = extractAuditDetail(latestOutboundEntry, OUTBOUND_ROUTE_MODE_PATTERN);
-  const outboundRoute = extractAuditDetail(latestOutboundEntry, OUTBOUND_ROUTE_PATTERN);
-
-  if (workspaceResultCue) {
-    quickScan.workspaceResultState = workspaceResultCue;
-    quickScan.workspaceResultCue = workspaceResultCue;
-  }
-
-  if (outboundRouteMode === 'explicit' || outboundRouteMode === 'implicit') {
-    quickScan.outboundRouteMode = outboundRouteMode;
-  }
-
-  if (outboundRoute) {
-    quickScan.outboundRoute = outboundRoute;
-  }
-
-  return quickScan;
 }
 
 export function renderRecentAuditQuickScan(entries: AuditEntry[]): string {

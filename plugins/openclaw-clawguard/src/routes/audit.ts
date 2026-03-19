@@ -8,6 +8,10 @@ import {
   CHECKUP_ROUTE_PATH,
   DASHBOARD_ROUTE_PATH,
   INSTALL_DEMO,
+  readOutboundRouteFromDetail,
+  readOutboundRouteMode,
+  readWorkspaceResultCueFromDetail,
+  readWorkspaceResultStateFromDetail,
   renderAuditFlowHandoffCopy,
   renderAuditLiveQueueHintCopy,
   renderClawGuardNav,
@@ -397,7 +401,7 @@ function buildTimelineFlow(flowId: string, entries: AuditEntry[]): TimelineFlow 
 
 function toTimelineEvent(entry: AuditEntry): TimelineEvent {
   const guide = AUDIT_KIND_GUIDE[entry.kind];
-  const routeMode = readRouteModeFromDetail(entry.detail);
+  const routeMode = readOutboundRouteMode(entry.detail);
   const outboundRoute = readOutboundRouteFromDetail(entry.detail);
   return {
     recordId: entry.record_id,
@@ -440,7 +444,7 @@ function summarizeFlowRiskDecision(entries: AuditEntry[]): string {
 
 function summarizeFlowRouteMode(entries: AuditEntry[]): RouteMode | undefined {
   for (const entry of entries) {
-    const routeMode = readRouteModeFromDetail(entry.detail);
+    const routeMode = readOutboundRouteMode(entry.detail);
     if (routeMode) {
       return routeMode;
     }
@@ -643,7 +647,7 @@ function buildFlowTitle(toolName?: string, pendingActionId?: string, workspaceSt
 
 function summarizeFlowWorkspaceState(entries: AuditEntry[]): string | undefined {
   for (const entry of [...entries].reverse()) {
-    const workspaceState = readWorkspaceStateFromDetail(entry.detail);
+    const workspaceState = readWorkspaceResultStateFromDetail(entry.detail);
     if (workspaceState) {
       return workspaceState;
     }
@@ -674,56 +678,6 @@ function buildFlowSubtitle(runId?: string, pendingActionId?: string): string {
 
 function firstDefined(values: ReadonlyArray<string | undefined>): string | undefined {
   return values.find((value): value is string => typeof value === 'string' && value.length > 0);
-}
-
-function readRouteModeFromDetail(detail: string): RouteMode | undefined {
-  const match = detail.match(/\bRoute mode(?:=|:)\s*(explicit|implicit)\b/i);
-  if (!match) {
-    return undefined;
-  }
-
-  const routeMode = match[1]?.toLowerCase();
-  return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
-}
-
-function readOutboundRouteFromDetail(detail: string): string | undefined {
-  const marker = 'Outbound route=';
-  const startIndex = detail.indexOf(marker);
-  if (startIndex < 0) {
-    return undefined;
-  }
-
-  const remainder = detail.slice(startIndex + marker.length);
-  const sentenceBoundary = remainder.indexOf('. ');
-  const outboundRoute =
-    sentenceBoundary >= 0
-      ? remainder.slice(0, sentenceBoundary).trim()
-      : remainder.endsWith('.')
-        ? remainder.slice(0, -1).trim()
-        : remainder.trim();
-
-  return outboundRoute.length > 0 ? outboundRoute : undefined;
-}
-
-function readWorkspaceStateFromDetail(detail: string): string | undefined {
-  const workspaceStateMatch = detail.match(/\bworkspace result state=([a-z-]+)\b/i);
-  if (workspaceStateMatch?.[1]) {
-    return workspaceStateMatch[1].toLowerCase();
-  }
-
-  return detail.match(/\boperation type=([a-z-]+)\b/i)?.[1]?.toLowerCase();
-}
-
-function readWorkspaceResultCueFromDetail(detail: string): string | undefined {
-  const marker = 'workspace result state=';
-  const startIndex = detail.toLowerCase().indexOf(marker);
-  if (startIndex < 0) {
-    return undefined;
-  }
-
-  const remainder = detail.slice(startIndex + marker.length);
-  const cue = remainder.split(';', 1)[0]?.trim();
-  return cue && cue.length > 0 ? cue : undefined;
 }
 
 function formatTimestamp(value: string): string {

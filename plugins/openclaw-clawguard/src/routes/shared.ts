@@ -73,6 +73,15 @@ export interface ControlSurfaceLanePressure {
   readonly mix: string;
 }
 
+export type OutboundRouteMode = 'explicit' | 'implicit';
+
+export interface RecentAuditQuickScan {
+  readonly workspaceResultState?: string;
+  readonly workspaceResultCue?: string;
+  readonly outboundRouteMode?: OutboundRouteMode;
+  readonly outboundRoute?: string;
+}
+
 export type ControlSurfaceHandoffMode = 'dashboard' | 'checkup';
 
 export const INSTALL_DEMO = {
@@ -104,6 +113,11 @@ export const INSTALL_DEMO = {
   navigationPosture:
     'There is no stock Control UI Security tab for this alpha, and ClawGuard does not depend on a patched nav hack.',
 } as const;
+
+const WORKSPACE_RESULT_STATE_PATTERN = /workspace result state=([^;]+?)(?:;|$)/i;
+const WORKSPACE_RESULT_CUE_MARKER = 'workspace result state=';
+const OUTBOUND_ROUTE_MODE_PATTERN = /Route mode=([^.;]+?)(?=\.|$)/i;
+const OUTBOUND_ROUTE_PATTERN = /Outbound route=([\s\S]*?)(?=\. [A-Z]|\. $|$)/i;
 
 const CONTROL_SURFACE_POSTURE =
   'Alpha control surface only. Plugin-owned, install-demo only, unpublished, fake-only, and not a stock Control UI Security tab.';
@@ -284,6 +298,128 @@ export function renderCoverageMatrix(): string {
   ).join('\n');
 
   return `<ul>${items}</ul>`;
+}
+
+export function trimTrailingPunctuation(value: string): string {
+  return value.trim().replace(/[.;,]+$/u, '');
+}
+
+export function readOutboundRouteMode(value: string | undefined): OutboundRouteMode | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const textualMatch = value.match(/\bRoute mode(?:=|:)\s*(explicit|implicit)\b/i);
+  if (textualMatch?.[1]) {
+    const routeMode = textualMatch[1].toLowerCase();
+    return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
+  }
+
+  const titleMatch = value.match(/\((explicit|implicit) route\)/i);
+  if (titleMatch?.[1]) {
+    const routeMode = titleMatch[1].toLowerCase();
+    return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
+  }
+
+  return undefined;
+}
+
+export function readOutboundRouteFromDetail(detail: string): string | undefined {
+  const startIndex = detail.indexOf('Outbound route=');
+  if (startIndex < 0) {
+    return undefined;
+  }
+
+  const remainder = detail.slice(startIndex + 'Outbound route='.length);
+  const sentenceBoundary = remainder.indexOf('. ');
+  const outboundRoute =
+    sentenceBoundary >= 0
+      ? remainder.slice(0, sentenceBoundary).trim()
+      : remainder.endsWith('.')
+        ? remainder.slice(0, -1).trim()
+        : remainder.trim();
+
+  return outboundRoute.length > 0 ? outboundRoute : undefined;
+}
+
+export function readWorkspaceResultStateFromDetail(detail: string): string | undefined {
+  const workspaceStateMatch = detail.match(/\bworkspace result state=([a-z-]+)\b/i);
+  if (workspaceStateMatch?.[1]) {
+    return workspaceStateMatch[1].toLowerCase();
+  }
+
+  return detail.match(/\boperation type=([a-z-]+)\b/i)?.[1]?.toLowerCase();
+}
+
+export function readWorkspaceResultCueFromDetail(detail: string): string | undefined {
+  const startIndex = detail.toLowerCase().indexOf(WORKSPACE_RESULT_CUE_MARKER);
+  if (startIndex < 0) {
+    return undefined;
+  }
+
+  const remainder = detail.slice(startIndex + WORKSPACE_RESULT_CUE_MARKER.length);
+  const cue = remainder.split(';', 1)[0]?.trim();
+  return cue && cue.length > 0 ? cue : undefined;
+}
+
+function extractAuditDetail(detail: string | undefined, pattern: RegExp): string | undefined {
+  if (!detail) {
+    return undefined;
+  }
+
+  const match = detail.match(pattern);
+  return match?.[1] ? trimTrailingPunctuation(match[1]) : undefined;
+}
+
+export function buildRecentAuditQuickScan(
+  entries: ReadonlyArray<{ readonly detail: string }>,
+): RecentAuditQuickScan {
+  const details = [...entries].map((entry) => entry.detail);
+  const latestWorkspaceDetail = details.find((detail) => WORKSPACE_RESULT_STATE_PATTERN.test(detail));
+  const latestOutboundDetail = details.find(
+    (detail) => OUTBOUND_ROUTE_MODE_PATTERN.test(detail) || OUTBOUND_ROUTE_PATTERN.test(detail),
+  );
+
+  const quickScan: {
+    workspaceResultState?: string;
+    workspaceResultCue?: string;
+    outboundRouteMode?: OutboundRouteMode;
+    outboundRoute?: string;
+  } = {};
+  const workspaceResultCue = latestWorkspaceDetail
+    ? readWorkspaceResultCueFromDetail(latestWorkspaceDetail)
+    : undefined;
+  const workspaceResultState = latestWorkspaceDetail
+    ? readWorkspaceResultStateFromDetail(latestWorkspaceDetail)
+    : undefined;
+  const outboundRouteModeCandidate = extractAuditDetail(
+    latestOutboundDetail,
+    OUTBOUND_ROUTE_MODE_PATTERN,
+  );
+  const outboundRouteMode =
+    outboundRouteModeCandidate === 'explicit' || outboundRouteModeCandidate === 'implicit'
+      ? outboundRouteModeCandidate
+      : undefined;
+  const outboundRoute = latestOutboundDetail
+    ? extractAuditDetail(latestOutboundDetail, OUTBOUND_ROUTE_PATTERN)
+    : undefined;
+
+  if (workspaceResultCue) {
+    quickScan.workspaceResultCue = workspaceResultCue;
+    quickScan.workspaceResultState = workspaceResultCue;
+  } else if (workspaceResultState) {
+    quickScan.workspaceResultState = workspaceResultState;
+  }
+
+  if (outboundRouteMode) {
+    quickScan.outboundRouteMode = outboundRouteMode;
+  }
+
+  if (outboundRoute) {
+    quickScan.outboundRoute = outboundRoute;
+  }
+
+  return quickScan;
 }
 
 export function summarizeControlSurfaceDomains(

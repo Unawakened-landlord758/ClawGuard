@@ -9,6 +9,7 @@ import {
   DASHBOARD_ROUTE_PATH,
   INSTALL_DEMO,
   getOperatorAction,
+  readOutboundRouteMode,
   renderClawGuardNav,
   renderControlSurfaceIntro,
   renderApprovalsHandoffCopy,
@@ -163,26 +164,6 @@ function describeOutboundRouteMode(entry: PendingAction): string | undefined {
     if (routeMode) {
       return `${routeMode} route`;
     }
-  }
-
-  return undefined;
-}
-
-function readOutboundRouteMode(value: string | undefined): 'explicit' | 'implicit' | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const textualMatch = value.match(/\bRoute mode(?:=|:)\s*(explicit|implicit)\b/i);
-  if (textualMatch?.[1]) {
-    const routeMode = textualMatch[1].toLowerCase();
-    return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
-  }
-
-  const titleMatch = value.match(/\((explicit|implicit) route\)/i);
-  if (titleMatch?.[1]) {
-    const routeMode = titleMatch[1].toLowerCase();
-    return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
   }
 
   return undefined;
