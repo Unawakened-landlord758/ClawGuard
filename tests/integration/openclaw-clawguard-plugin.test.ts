@@ -1203,6 +1203,37 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('formats rename-like workspace result details as readable path pairs in the final audit trail', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\templates\\ci-template.yml',
+      content: 'name: CI\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          renamed: {
+            fromPath: 'src\\templates\\ci-template.yml',
+            toPath: '.github\\workflows\\ci-template.yml',
+          },
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=rename-like via renamed; renamed=src\\templates\\ci-template.yml -> .github\\workflows\\ci-template.yml',
+    );
+  });
+
   it('keeps exec finalization on after_tool_call even when tool_result_persist fires', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
@@ -1708,7 +1739,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
           '/plugins/clawguard/settings',
         ],
         limitations:
-          'Host-level direct outbound cannot enter the pending approval loop, so message_sending stays on the hard-block path for both approve_required and block cases; message_sent only closes sends that were actually allowed to leave the host, while tool-level approvals stay on message / sessions_send.',
+          'Host-level direct outbound cannot enter the pending approval loop, so message_sending never enters the pending queue; message_sent only closes sends that were actually allowed to leave the host, while tool-level approvals stay on message / sessions_send.',
       },
     });
   });
@@ -1850,7 +1881,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
     expect(dashboardHtmlResponse.body).toContain('Dashboard = status');
     expect(dashboardHtmlResponse.body).toContain(
-      'Need the deeper Alpha explanation? Open the plugin-owned <a href="/plugins/clawguard/checkup">full safety checkup</a> for the same read-only posture source with per-item evidence and follow-up actions, then use <a href="/plugins/clawguard/approvals">Approvals</a> for any live item that still needs a decision or retry, and use <a href="/plugins/clawguard/audit">Audit</a> for the final closure after the item leaves the queue.',
+      'Need the deeper Alpha explanation? Open the plugin-owned <a href="/plugins/clawguard/checkup">full safety checkup</a> for the same read-only posture source with per-item evidence and follow-up actions. For outbound, tool-level <code>message</code> and <code>sessions_send</code> approvals live in <a href="/plugins/clawguard/approvals">Approvals</a>, while host-level <code>message_sending</code> never enters the live queue and belongs in <a href="/plugins/clawguard/audit">Audit</a> after the send is blocked or actually delivered.',
     );
     expect(dashboardHtmlResponse.body).toContain(
       'These pages reorganize the same bounded approval, posture, and audit signals only.',
@@ -1882,7 +1913,11 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(dashboardHtmlResponse.body).toContain('Exec</strong> (<code>exec</code>)');
     expect(dashboardHtmlResponse.body).toContain('Approval demo path only.');
     expect(dashboardHtmlResponse.body).toContain('Outbound</strong> (<code>outbound</code>)');
-    expect(dashboardHtmlResponse.body).toContain('host-level message_sending stays on the hard-block path');
+    expect(dashboardHtmlResponse.body).toContain('Outbound handoff');
+    expect(dashboardHtmlResponse.body).toContain('Tool-level approvals');
+    expect(dashboardHtmlResponse.body).toContain('Host-level direct outbound');
+    expect(dashboardHtmlResponse.body).toContain('never enters the pending approval loop');
+    expect(dashboardHtmlResponse.body).toContain('message_sent');
     expect(dashboardHtmlResponse.body).toContain('Workspace</strong> (<code>workspace</code>)');
     expect(dashboardHtmlResponse.body).toContain('tool_result_persist fallback for result closure');
     expect(dashboardHtmlResponse.body).toContain('Live posture by domain');
@@ -2310,6 +2345,11 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(checkupHtmlResponse.body).toContain(
       'This is the fixed install-demo legend for the current product surface.',
     );
+    expect(checkupHtmlResponse.body).toContain('Outbound handoff');
+    expect(checkupHtmlResponse.body).toContain('Tool-level approvals');
+    expect(checkupHtmlResponse.body).toContain('Host-level direct outbound');
+    expect(checkupHtmlResponse.body).toContain('never enters the pending approval loop');
+    expect(checkupHtmlResponse.body).toContain('message_sent');
     expect(checkupHtmlResponse.body).toContain('Live posture by domain');
     expect(checkupHtmlResponse.body).toContain(
       'This is the live split of the same posture signals used to produce the current dashboard summary.',
@@ -2329,7 +2369,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(checkupHtmlResponse.body).toContain('Outbound</strong> (<code>outbound</code>)');
     expect(checkupHtmlResponse.body).toContain('Workspace</strong> (<code>workspace</code>)');
     expect(checkupHtmlResponse.body).toContain(
-      'When an item is still live, continue to Approvals to act on it; when it has already closed, continue to Audit for the final replay trail.',
+      'When an item is still live, continue to <a href="/plugins/clawguard/approvals">Approvals</a> to act on it; when it has already closed, continue to <a href="/plugins/clawguard/audit">Audit</a> for the final replay trail. For outbound, tool-level approvals stay live in Approvals, and host-level direct outbound is only explained in Audit after the send blocks or closes.',
     );
     expect(checkupHtmlResponse.body).toContain(`<strong>${dashboardPayload.safetyStatus.label}</strong>`);
     expect(checkupHtmlResponse.body).toContain(dashboardPayload.safetyStatus.summary);

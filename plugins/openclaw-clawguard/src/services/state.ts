@@ -986,6 +986,11 @@ function summarizeStructuredResultField(
   fieldName: 'created' | 'updated' | 'deleted' | 'renamed',
 ): string | undefined {
   const value = record[fieldName];
+  const pathPairValue = summarizeStructuredResultPathPairValue(value);
+  if (pathPairValue) {
+    return `${fieldName}=${pathPairValue}`;
+  }
+
   const normalizedValue = readOptionalString(value);
   if (normalizedValue) {
     return `${fieldName}=${normalizedValue}`;
@@ -994,6 +999,36 @@ function summarizeStructuredResultField(
   const normalizedValues = readOptionalStringArray(value);
   if (normalizedValues.length > 0) {
     return `${fieldName}=${normalizedValues.join(', ')}`;
+  }
+
+  return undefined;
+}
+
+function summarizeStructuredResultPathPairValue(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const fromPath = readOptionalStringFromKeys(record, ['fromPath', 'oldPath', 'from', 'old']);
+  const toPath = readOptionalStringFromKeys(record, ['toPath', 'newPath', 'to', 'new']);
+
+  if (fromPath && toPath) {
+    return `${fromPath} -> ${toPath}`;
+  }
+
+  return fromPath ?? toPath;
+}
+
+function readOptionalStringFromKeys(
+  record: Record<string, unknown>,
+  keys: ReadonlyArray<string>,
+): string | undefined {
+  for (const key of keys) {
+    const value = readOptionalString(record[key]);
+    if (value) {
+      return value;
+    }
   }
 
   return undefined;
