@@ -587,18 +587,38 @@ function buildImpactScope(artifacts: EvaluationArtifacts): string | undefined {
 }
 
 function buildRiskHitDetail(artifacts: EvaluationArtifacts): string {
-  return `${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+  const destinationDetail = buildOutboundDestinationDetailFromEvaluationInput(artifacts.evaluation_input);
+
+  return [destinationDetail, artifacts.policy_decision.reason, artifacts.risk_event.summary]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .trim();
 }
 
 function buildBeforeBlockDetail(artifacts: EvaluationArtifacts): string {
-  return `Blocked before execution. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+  const destinationDetail = buildOutboundDestinationDetailFromEvaluationInput(artifacts.evaluation_input);
+
+  return ['Blocked before execution.', destinationDetail, artifacts.policy_decision.reason, artifacts.risk_event.summary]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .trim();
 }
 
 function buildPendingBlockDetail(
   artifacts: EvaluationArtifacts,
   pendingActionId: string,
 ): string {
-  return `Blocked before execution and queued ${pendingActionId}. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+  const destinationDetail = buildOutboundDestinationDetailFromEvaluationInput(artifacts.evaluation_input);
+
+  return [
+    `Blocked before execution and queued ${pendingActionId}.`,
+    destinationDetail,
+    artifacts.policy_decision.reason,
+    artifacts.risk_event.summary,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(' ')
+    .trim();
 }
 
 function buildHostOutboundBlockDetail(artifacts: EvaluationArtifacts): string {
@@ -692,7 +712,7 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
     readOptionalString(record.path),
     readOptionalString(record.filePath),
     readOptionalString(record.patchPath),
-    ...readOptionalStringArray(record.paths),
+    ...summarizeStructuredResultValues(record.paths),
   ].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
 
   if (summary) {
@@ -1011,37 +1031,55 @@ function readOptionalString(value: unknown): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function readOptionalStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((entry) => readOptionalString(entry))
-    .filter((entry): entry is string => Boolean(entry));
-}
-
 function summarizeStructuredResultField(
   record: Record<string, unknown>,
   fieldName: 'created' | 'updated' | 'deleted' | 'renamed',
 ): string | undefined {
-  const value = record[fieldName];
-  const pathPairValue = summarizeStructuredResultPathPairValue(value);
-  if (pathPairValue) {
-    return `${fieldName}=${pathPairValue}`;
-  }
-
-  const normalizedValue = readOptionalString(value);
+  const normalizedValue = summarizeStructuredResultFieldValue(record[fieldName]);
   if (normalizedValue) {
     return `${fieldName}=${normalizedValue}`;
   }
 
-  const normalizedValues = readOptionalStringArray(value);
-  if (normalizedValues.length > 0) {
-    return `${fieldName}=${normalizedValues.join(', ')}`;
+  return undefined;
+}
+
+function summarizeStructuredResultFieldValue(value: unknown): string | undefined {
+  const normalizedValues = summarizeStructuredResultValues(value);
+  return normalizedValues.length > 0 ? normalizedValues.join(', ') : undefined;
+}
+
+function summarizeStructuredResultValues(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return readOptionalString(value) ? [value.trim()] : [];
   }
 
-  return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => summarizeStructuredResultEntry(entry))
+      .filter((entry): entry is string => Boolean(entry))
+      .filter((entry, index, all) => all.indexOf(entry) === index);
+  }
+
+  const singleValue = summarizeStructuredResultEntry(value);
+  return singleValue ? [singleValue] : [];
+}
+
+function summarizeStructuredResultEntry(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return readOptionalString(value);
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const pathPairValue = summarizeStructuredResultPathPairValue(record);
+  if (pathPairValue) {
+    return pathPairValue;
+  }
+
+  return readOptionalStringFromKeys(record, ['path', 'filePath', 'patchPath']);
 }
 
 function summarizeStructuredResultPathPairValue(value: unknown): string | undefined {

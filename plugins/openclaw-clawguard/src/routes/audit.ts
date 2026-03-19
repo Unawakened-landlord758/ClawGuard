@@ -42,6 +42,7 @@ type TimelineEvent = {
   readonly systemAction: string;
   readonly userDecision: string;
   readonly finalOutcome: string;
+  readonly outboundRoute?: string;
   readonly routeMode?: RouteMode;
 };
 
@@ -58,6 +59,7 @@ type TimelineFlow = {
   readonly runId?: string;
   readonly origin: string;
   readonly riskDecision: string;
+  readonly outboundRoute?: string;
   readonly routeMode?: RouteMode;
   readonly systemAction: string;
   readonly userDecision: string;
@@ -333,6 +335,7 @@ function buildTimelineFlow(flowId: string, entries: AuditEntry[]): TimelineFlow 
   const pendingActionId = firstDefined(entries.map((entry) => entry.pending_action_id));
   const runId = firstDefined(entries.map((entry) => entry.run_id));
   const routeMode = summarizeFlowRouteMode(entries);
+  const outboundRoute = summarizeFlowOutboundRoute(entries);
   const workspaceState = summarizeFlowWorkspaceState(entries);
   const userDecision = summarizeFlowUserDecision(entries);
   const finalOutcome = summarizeFlowOutcome(entries, userDecision);
@@ -351,6 +354,7 @@ function buildTimelineFlow(flowId: string, entries: AuditEntry[]): TimelineFlow 
     ...(runId ? { runId } : {}),
     origin,
     riskDecision: summarizeFlowRiskDecision(entries),
+    ...(outboundRoute ? { outboundRoute } : {}),
     ...(routeMode ? { routeMode } : {}),
     systemAction: summarizeFlowSystemAction(entries),
     userDecision,
@@ -363,6 +367,7 @@ function buildTimelineFlow(flowId: string, entries: AuditEntry[]): TimelineFlow 
 function toTimelineEvent(entry: AuditEntry): TimelineEvent {
   const guide = AUDIT_KIND_GUIDE[entry.kind];
   const routeMode = readRouteModeFromDetail(entry.detail);
+  const outboundRoute = readOutboundRouteFromDetail(entry.detail);
   return {
     recordId: entry.record_id,
     kind: entry.kind,
@@ -371,6 +376,7 @@ function toTimelineEvent(entry: AuditEntry): TimelineEvent {
     timestamp: entry.timestamp,
     timestampLabel: formatTimestamp(entry.timestamp),
     detail: entry.detail,
+    ...(outboundRoute ? { outboundRoute } : {}),
     ...(routeMode ? { routeMode } : {}),
     ...(entry.tool_name ? { toolName: entry.tool_name } : {}),
     ...(entry.pending_action_id ? { pendingActionId: entry.pending_action_id } : {}),
@@ -406,6 +412,17 @@ function summarizeFlowRouteMode(entries: AuditEntry[]): RouteMode | undefined {
     const routeMode = readRouteModeFromDetail(entry.detail);
     if (routeMode) {
       return routeMode;
+    }
+  }
+
+  return undefined;
+}
+
+function summarizeFlowOutboundRoute(entries: AuditEntry[]): string | undefined {
+  for (const entry of entries) {
+    const outboundRoute = readOutboundRouteFromDetail(entry.detail);
+    if (outboundRoute) {
+      return outboundRoute;
     }
   }
 
@@ -571,6 +588,25 @@ function readRouteModeFromDetail(detail: string): RouteMode | undefined {
   return routeMode === 'explicit' || routeMode === 'implicit' ? routeMode : undefined;
 }
 
+function readOutboundRouteFromDetail(detail: string): string | undefined {
+  const marker = 'Outbound route=';
+  const startIndex = detail.indexOf(marker);
+  if (startIndex < 0) {
+    return undefined;
+  }
+
+  const remainder = detail.slice(startIndex + marker.length);
+  const sentenceBoundary = remainder.indexOf('. ');
+  const outboundRoute =
+    sentenceBoundary >= 0
+      ? remainder.slice(0, sentenceBoundary).trim()
+      : remainder.endsWith('.')
+        ? remainder.slice(0, -1).trim()
+        : remainder.trim();
+
+  return outboundRoute.length > 0 ? outboundRoute : undefined;
+}
+
 function readWorkspaceStateFromDetail(detail: string): string | undefined {
   const workspaceStateMatch = detail.match(/\bworkspace result state=([a-z-]+)\b/i);
   if (workspaceStateMatch?.[1]) {
@@ -614,6 +650,7 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
               <p><strong>System did:</strong> ${escapeHtml(flow.systemAction)}</p>
               <p><strong>User decision:</strong> ${escapeHtml(flow.userDecision)}</p>
               <p><strong>Final outcome:</strong> ${escapeHtml(flow.finalOutcome)}</p>
+              ${flow.outboundRoute ? `<p><strong>Outbound route:</strong> ${escapeHtml(flow.outboundRoute)}</p>` : ''}
               ${flow.routeMode ? `<p><strong>Route mode:</strong> ${escapeHtml(flow.routeMode)} route</p>` : ''}
               <p><strong>Inspect next:</strong> ${escapeHtml(flow.inspectNext)}</p>
             </div>
@@ -643,6 +680,7 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
                       <p><strong>System did:</strong> ${escapeHtml(event.systemAction)}</p>
                       <p><strong>User decision:</strong> ${escapeHtml(event.userDecision)}</p>
                       <p><strong>Final outcome:</strong> ${escapeHtml(event.finalOutcome)}</p>
+                      ${event.outboundRoute ? `<p><strong>Outbound route:</strong> ${escapeHtml(event.outboundRoute)}</p>` : ''}
                       ${event.routeMode ? `<p><strong>Route mode:</strong> ${escapeHtml(event.routeMode)} route</p>` : ''}
                       <p><strong>Recorded detail:</strong> ${escapeHtml(event.detail)}</p>
                       <p class="audit-event__footnote">

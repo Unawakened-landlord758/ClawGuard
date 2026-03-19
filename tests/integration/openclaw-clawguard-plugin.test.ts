@@ -1234,6 +1234,85 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('summarizes arrays of workspace path pairs in the final audit trail', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\templates\\ci-template.yml',
+      content: 'name: CI\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          renamed: [
+            {
+              fromPath: 'src\\templates\\ci-template.yml',
+              toPath: '.github\\workflows\\ci-template.yml',
+            },
+            {
+              fromPath: 'src\\templates\\release-template.yml',
+              toPath: '.github\\workflows\\release-template.yml',
+            },
+          ],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=rename-like via renamed; renamed=src\\templates\\ci-template.yml -> .github\\workflows\\ci-template.yml, src\\templates\\release-template.yml -> .github\\workflows\\release-template.yml',
+    );
+  });
+
+  it('summarizes mixed readable workspace result objects without widening ambiguous entries', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          created: [
+            {
+              path: 'src\\generated\\feature-flags.ts',
+              label: 'feature flags',
+            },
+            'src\\generated\\feature-switches.ts',
+            {
+              filePath: 'src\\generated\\feature-toggles.ts',
+              note: 'readable path object',
+            },
+            {
+              note: 'ignore me',
+            },
+          ],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=insert via created; created=src\\generated\\feature-flags.ts, src\\generated\\feature-switches.ts, src\\generated\\feature-toggles.ts',
+    );
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).not.toContain('ignore me');
+  });
+
   it('normalizes workspace result operation_type synonyms into the shared final state labels', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
@@ -1452,8 +1531,45 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(auditHtmlResponse.statusCode).toBe(200);
     expect(auditHtmlResponse.body).toContain('Origin:</strong> Direct host outbound');
     expect(auditHtmlResponse.body).toContain('There is no live Approvals queue for this lane');
+    expect(auditHtmlResponse.body).toContain('Outbound route:</strong>');
+    expect(auditHtmlResponse.body).toContain('C123 via slack/default/C123');
     expect(auditHtmlResponse.body).toContain(
-      'Host-level direct outbound never enters Approvals. Inspect Blocked as the current replay ending.',
+      'This replay came from host-level direct outbound. There is no live Approvals queue for this lane, so inspect the recorded ending here.',
+    );
+
+    const auditJsonResponse = createMockResponse();
+    auditRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/audit?format=json',
+      } as never,
+      auditJsonResponse as never,
+    );
+
+    expect(auditJsonResponse.statusCode).toBe(200);
+    const auditPayload = JSON.parse(auditJsonResponse.body) as {
+      timeline: {
+        flows: Array<{
+          origin: string;
+          outboundRoute?: string;
+          events: Array<{
+            outboundRoute?: string;
+          }>;
+        }>;
+      };
+    };
+    expect(auditPayload.timeline.flows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          origin: 'Direct host outbound',
+          outboundRoute: expect.stringContaining('C123 via slack/default/C123'),
+          events: expect.arrayContaining([
+            expect.objectContaining({
+              outboundRoute: expect.stringContaining('C123 via slack/default/C123'),
+            }),
+          ]),
+        }),
+      ]),
     );
   });
 
