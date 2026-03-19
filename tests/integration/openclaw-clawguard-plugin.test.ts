@@ -1280,6 +1280,33 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('keeps top-level workspace path-pair closure summaries even without status, summary, or path arrays', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\templates\\ci-template.yml',
+      content: 'name: CI\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          fromPath: 'src\\templates\\ci-template.yml',
+          toPath: '.github\\workflows\\ci-template.yml',
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: workspace result state=rename-like via renamed; renamed=src\\templates\\ci-template.yml -> .github\\workflows\\ci-template.yml',
+    );
+  });
+
   it('keeps incomplete or conflicting top-level workspace path pairs on the existing closure logic', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);

@@ -737,7 +737,7 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
     return summarySegments.join('; ').trim();
   }
 
-  if (!operationType && !status && paths.length === 0) {
+  if (!operationType && !status && !workspaceResultState && !created && !updated && !deleted && !renamed && paths.length === 0) {
     return undefined;
   }
 
