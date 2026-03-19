@@ -1199,7 +1199,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     });
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain('Final outcome allowed after execution.');
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
-      'Result detail: tool result status=completed; workspace result state=insert; created=src\\generated\\feature-flags.ts',
+      'Result detail: tool result status=completed; workspace result state=insert via created; created=src\\generated\\feature-flags.ts',
     );
   });
 

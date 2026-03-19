@@ -698,7 +698,11 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
       summary,
       operationType ? `operation type=${operationType}` : undefined,
       status ? `tool result status=${status}` : undefined,
-      workspaceResultState ? `workspace result state=${workspaceResultState}` : undefined,
+      workspaceResultState
+        ? `workspace result state=${workspaceResultState.state}${
+            workspaceResultState.source ? ` via ${workspaceResultState.source}` : ''
+          }`
+        : undefined,
       created,
       updated,
       deleted,
@@ -716,7 +720,11 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
   const segments = [
     operationType ? `operation type=${operationType}` : undefined,
     status ? `tool result status=${status}` : undefined,
-    workspaceResultState ? `workspace result state=${workspaceResultState}` : undefined,
+    workspaceResultState
+      ? `workspace result state=${workspaceResultState.state}${
+          workspaceResultState.source ? ` via ${workspaceResultState.source}` : ''
+        }`
+      : undefined,
     created,
     updated,
     deleted,
@@ -733,10 +741,13 @@ function summarizeWorkspaceResultState(
   updated: string | undefined,
   deleted: string | undefined,
   renamed: string | undefined,
-): string | undefined {
+): { readonly state: string; readonly source?: 'operation_type' | 'created' | 'updated' | 'deleted' | 'renamed' } | undefined {
   const normalizedOperationType = readOptionalString(operationType)?.toLowerCase();
   if (normalizedOperationType) {
-    return normalizedOperationType;
+    return {
+      state: normalizedOperationType,
+      source: 'operation_type',
+    };
   }
 
   const definedFieldKinds = [created, updated, deleted, renamed].filter(
@@ -747,19 +758,31 @@ function summarizeWorkspaceResultState(
   }
 
   if (created) {
-    return 'insert';
+    return {
+      state: 'insert',
+      source: 'created',
+    };
   }
 
   if (updated) {
-    return 'modify';
+    return {
+      state: 'modify',
+      source: 'updated',
+    };
   }
 
   if (deleted) {
-    return 'delete';
+    return {
+      state: 'delete',
+      source: 'deleted',
+    };
   }
 
   if (renamed) {
-    return 'rename-like';
+    return {
+      state: 'rename-like',
+      source: 'renamed',
+    };
   }
 
   return undefined;
