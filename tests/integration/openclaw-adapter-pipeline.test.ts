@@ -444,6 +444,40 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
   });
 
+  it('surfaces sourcePath/targetPath rename-like semantics in workspace approvals and audit artifacts', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'write',
+          params: {
+            sourcePath: 'src\\templates\\deploy-template.yml',
+            targetPath: '.github\\workflows\\deploy-template.yml',
+            content: 'name: Deploy\n',
+          },
+          runId: 'run-write-source-target-rename-1',
+          toolCallId: 'tool-write-source-target-rename-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-write-source-target-rename',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\deploy-template.yml', '.github\\workflows\\deploy-template.yml'],
+      summary: 'name: Deploy',
+      operation_type: 'rename-like',
+    });
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (rename-like)',
+      impact_scope: 'src\\templates\\deploy-template.yml, .github\\workflows\\deploy-template.yml',
+    });
+    expect(result.risk_event.summary).toContain('rename-like');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
+  });
+
   it('surfaces clean git rename headers as rename-like workspace semantics in approval and audit artifacts', () => {
     const result = buildOpenClawEvaluationArtifacts({
       clock: fixedClock,
@@ -584,6 +618,45 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.risk_event.summary).toContain('Operation type: modify.');
     expect(result.risk_event.explanation).toContain('Workspace operation type=modify.');
     expect(result.audit_record.final_status).toBe(AuditRecordFinalStatus.Logged);
+  });
+
+  it('routes edit oldValue/newValue aliases through the workspace mutation pipeline', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'edit',
+          params: {
+            path: '.env',
+            oldValue: 'src\\templates\\approval-policy.ts',
+            newValue: 'src\\guards\\approval-policy.ts',
+          },
+          runId: 'run-edit-value-aliases-1',
+          toolCallId: 'tool-edit-value-aliases-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-edit-value-aliases',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['.env'],
+      summary: 'src\\guards\\approval-policy.ts',
+      operation_type: 'rename-like',
+    });
+    expect(result.evaluation_input.raw_text_candidates).toEqual([
+      'src\\guards\\approval-policy.ts',
+      '.env',
+      'src\\templates\\approval-policy.ts',
+    ]);
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (rename-like)',
+      impact_scope: '.env',
+    });
+    expect(result.risk_event.summary).toContain('rename-like');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
   });
 
   it('surfaces rename-like edit semantics in approval and audit artifacts', () => {

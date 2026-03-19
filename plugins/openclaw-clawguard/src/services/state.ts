@@ -715,6 +715,9 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
     readOptionalString(record.filePath),
     readOptionalString(record.patchPath),
     ...summarizeStructuredResultValues(record.paths),
+    ...summarizeStructuredResultValues(record.changedPaths),
+    ...summarizeStructuredResultValues(record.changed_paths),
+    ...summarizeStructuredResultValues(record.filePaths),
   ].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
 
   if (summary) {
@@ -1037,16 +1040,26 @@ function summarizeStructuredResultField(
   record: Record<string, unknown>,
   fieldName: 'created' | 'updated' | 'deleted' | 'renamed',
 ): string | undefined {
-  const normalizedValue =
+  const normalizedValues =
     fieldName === 'renamed'
-      ? summarizeStructuredRenameFieldValue(record[fieldName])
-      : summarizeStructuredResultFieldValue(record[fieldName]);
-  if (normalizedValue) {
-    return `${fieldName}=${normalizedValue}`;
+      ? summarizeStructuredFieldAliasValues(record, [fieldName], summarizeStructuredRenameFieldValue)
+      : summarizeStructuredFieldAliasValues(
+          record,
+          StructuredResultFieldAliases[fieldName],
+          summarizeStructuredResultFieldValue,
+        );
+  if (normalizedValues.length > 0) {
+    return `${fieldName}=${normalizedValues.join(', ')}`;
   }
 
   return undefined;
 }
+
+const StructuredResultFieldAliases = {
+  created: ['created', 'added'],
+  updated: ['updated', 'modified'],
+  deleted: ['deleted', 'removed'],
+} as const satisfies Record<'created' | 'updated' | 'deleted', readonly string[]>;
 
 function summarizeStructuredResultFieldValue(value: unknown): string | undefined {
   const normalizedValues = summarizeStructuredResultValues(value);
@@ -1056,6 +1069,33 @@ function summarizeStructuredResultFieldValue(value: unknown): string | undefined
 function summarizeStructuredRenameFieldValue(value: unknown): string | undefined {
   const normalizedValues = summarizeStructuredRenameValues(value);
   return normalizedValues.length > 0 ? normalizedValues.join(', ') : undefined;
+}
+
+function summarizeStructuredFieldAliasValues(
+  record: Record<string, unknown>,
+  aliases: ReadonlyArray<string>,
+  summarizeFieldValue: (value: unknown) => string | undefined,
+): string[] {
+  const normalizedValues: string[] = [];
+  const seen = new Set<string>();
+
+  for (const alias of aliases) {
+    const normalizedValue = summarizeFieldValue(record[alias]);
+    if (!normalizedValue) {
+      continue;
+    }
+
+    for (const entry of normalizedValue.split(',').map((value) => value.trim()).filter(Boolean)) {
+      if (seen.has(entry)) {
+        continue;
+      }
+
+      seen.add(entry);
+      normalizedValues.push(entry);
+    }
+  }
+
+  return normalizedValues;
 }
 
 function summarizeTopLevelStructuredResultRename(record: Record<string, unknown>): string | undefined {

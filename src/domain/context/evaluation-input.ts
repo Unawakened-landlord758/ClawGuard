@@ -117,7 +117,9 @@ function detectEditWorkspaceMutationOperationType(
 function detectApplyPatchWorkspaceMutationOperationType(
   toolParams: Record<string, unknown>,
 ): WorkspaceMutationOperationType | undefined {
-  const patchText = normalizeWorkspaceMutationText(toolParams.patch ?? toolParams.patchText);
+  const patchText = normalizeWorkspaceMutationText(
+    toolParams.patch ?? toolParams.patchText ?? toolParams.patch_text,
+  );
   if (!patchText) {
     return undefined;
   }
@@ -253,6 +255,7 @@ function collectWorkspaceMutationPathPairs(
   const pairs = [
     createWorkspaceMutationPathPair(toolParams.fromPath, toolParams.toPath),
     createWorkspaceMutationPathPair(toolParams.oldPath, toolParams.newPath),
+    createWorkspaceMutationPathPair(toolParams.sourcePath, toolParams.targetPath),
   ].filter((pair): pair is WorkspaceMutationPathPair => Boolean(pair));
 
   const dedupedPairs: WorkspaceMutationPathPair[] = [];

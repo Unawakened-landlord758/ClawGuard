@@ -250,6 +250,7 @@ function buildAuditPayload(state: ClawGuardState): AuditTimelinePayload {
   const flows = buildTimelineFlows(audit);
   const latestOutboundRoute = findLatestOutboundRoute(flows);
   const latestOutboundRouteMode = findLatestOutboundRouteMode(flows);
+  const latestOutboundOrigin = findLatestOutboundOrigin(flows);
   const latestWorkspaceResultState = findLatestWorkspaceResultState(flows);
   const latestWorkspaceResultCue = findLatestWorkspaceResultCue(flows);
   const flowOutcomes = flows.reduce(
@@ -317,11 +318,16 @@ function buildAuditPayload(state: ClawGuardState): AuditTimelinePayload {
           ...guide,
         }),
       ),
-      ...(latestOutboundRoute || latestOutboundRouteMode || latestWorkspaceResultState || latestWorkspaceResultCue
+      ...(latestOutboundRoute ||
+      latestOutboundRouteMode ||
+      latestOutboundOrigin ||
+      latestWorkspaceResultState ||
+      latestWorkspaceResultCue
         ? {
             latest: {
               ...(latestOutboundRoute ? { latestOutboundRoute } : {}),
               ...(latestOutboundRouteMode ? { latestOutboundRouteMode } : {}),
+              ...(latestOutboundOrigin ? { latestOutboundOrigin } : {}),
               ...(latestWorkspaceResultState ? { latestWorkspaceResultState } : {}),
               ...(latestWorkspaceResultCue ? { latestWorkspaceResultCue } : {}),
             },
@@ -468,6 +474,22 @@ function findLatestOutboundRouteMode(flows: TimelineFlow[]): RouteMode | undefin
   for (const flow of flows) {
     if (flow.routeMode) {
       return flow.routeMode;
+    }
+  }
+
+  return undefined;
+}
+
+function findLatestOutboundOrigin(flows: TimelineFlow[]): string | undefined {
+  for (const flow of flows) {
+    if ((flow.outboundRoute || flow.routeMode) && flow.origin !== 'Direct audit trail') {
+      return flow.origin;
+    }
+  }
+
+  for (const flow of flows) {
+    if (flow.outboundRoute || flow.routeMode) {
+      return flow.origin;
     }
   }
 
@@ -722,6 +744,7 @@ function formatTimestamp(value: string): string {
 function renderAuditPage(payload: AuditTimelinePayload): string {
   const latestOutboundRoute = findLatestOutboundRoute(payload.timeline.flows);
   const latestOutboundRouteMode = findLatestOutboundRouteMode(payload.timeline.flows);
+  const latestOutboundOrigin = findLatestOutboundOrigin(payload.timeline.flows);
   const latestWorkspaceResultState = findLatestWorkspaceResultState(payload.timeline.flows);
   const latestWorkspaceResultCue = findLatestWorkspaceResultCue(payload.timeline.flows);
   const flowCards = payload.timeline.flows
@@ -857,6 +880,7 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
       <p>${renderAuditLiveQueueHintCopy()}</p>
       ${latestOutboundRoute ? `<p><strong>Latest outbound route in recent replay:</strong> ${escapeHtml(latestOutboundRoute)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       ${latestOutboundRouteMode ? `<p><strong>Latest outbound route mode in recent replay:</strong> ${escapeHtml(latestOutboundRouteMode)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latestOutboundOrigin ? `<p><strong>Latest outbound origin in recent replay:</strong> ${escapeHtml(latestOutboundOrigin)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       ${latestWorkspaceResultCue ? `<p><strong>Latest workspace result cue in recent replay:</strong> ${escapeHtml(latestWorkspaceResultCue)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       ${latestWorkspaceResultState ? `<p><strong>Latest workspace result state in recent replay:</strong> ${escapeHtml(latestWorkspaceResultState)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       <p><strong>Current posture:</strong> ${escapeHtml(INSTALL_DEMO.demoPosture)}</p>

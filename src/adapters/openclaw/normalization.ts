@@ -246,17 +246,40 @@ function normalizeWorkspaceContext(
     return undefined;
   }
 
-  const patchText = firstString(toolParams, ['patch', 'patchText']);
+  const patchText = firstString(toolParams, ['patch', 'patchText', 'patch_text']);
   const operationType = resolveWorkspaceMutationOperationType(normalizedToolName, toolParams, patchText);
   const candidatePaths = dedupeStrings([
-    ...readStringsFromKeys(toolParams, ['path', 'filePath', 'patchPath', 'fromPath', 'toPath', 'oldPath', 'newPath']),
+    ...readStringsFromKeys(toolParams, [
+      'path',
+      'filePath',
+      'patchPath',
+      'fromPath',
+      'toPath',
+      'oldPath',
+      'newPath',
+      'sourcePath',
+      'targetPath',
+    ]),
     ...readStringArray(toolParams.paths),
     ...extractPatchPaths(patchText),
   ]);
 
   return {
     paths: candidatePaths,
-    summary: firstString(toolParams, ['patch', 'patchText', 'content', 'newText', 'new_string', 'oldText', 'old_string']),
+    summary: firstString(toolParams, [
+      'patch',
+      'patchText',
+      'patch_text',
+      'content',
+      'newText',
+      'new_string',
+      'newValue',
+      'new_value',
+      'oldText',
+      'old_string',
+      'oldValue',
+      'old_value',
+    ]),
     operation_type: operationType,
   };
 }
@@ -699,7 +722,23 @@ export function normalizeToolStatus(agentEvent: OpenClawAgentEventInput | undefi
 
 function collectRawTextCandidates(toolParams: Record<string, unknown>): string[] {
   return dedupeStrings([
-    firstString(toolParams, ['command', 'text', 'message', 'content', 'patch', 'newText', 'new_string', 'oldText', 'old_string']),
+    firstString(toolParams, [
+      'command',
+      'text',
+      'message',
+      'content',
+      'patch',
+      'patchText',
+      'patch_text',
+      'newText',
+      'new_string',
+      'newValue',
+      'new_value',
+      'oldText',
+      'old_string',
+      'oldValue',
+      'old_value',
+    ]),
     ...Object.values(toolParams)
       .map((value) => normalizeOptionalString(value))
       .filter((value): value is string => Boolean(value)),

@@ -167,6 +167,30 @@ describe('Sprint 0 input normalization', () => {
     });
   });
 
+  it('normalizes sourcePath/targetPath workspace moves on the shared rename-like path', () => {
+    const normalized = normalizeOpenClawInputs({
+      before_tool_call: {
+        event: {
+          toolName: 'write',
+          params: {
+            sourcePath: 'src\\templates\\deploy-template.yml',
+            targetPath: '.github\\workflows\\deploy-template.yml',
+            content: 'name: Deploy\n',
+          },
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-write-source-target-rename',
+      },
+    });
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\deploy-template.yml', '.github\\workflows\\deploy-template.yml'],
+      summary: 'name: Deploy',
+      operation_type: 'rename-like',
+    });
+  });
+
   it('surfaces edit path-reference moves as rename-like when the filename stays the same across directories', () => {
     const normalized = normalizeOpenClawInputs({
       before_tool_call: {
@@ -217,6 +241,35 @@ describe('Sprint 0 input normalization', () => {
       operation_type: workspaceEditMutationFixture.expected.operation_type,
     });
     expect(normalized.evaluation_input.raw_text_candidates).toEqual(workspaceEditMutationFixture.expected.raw_text_candidates);
+  });
+
+  it('normalizes edit oldValue/newValue aliases into workspace context and text candidates', () => {
+    const normalized = normalizeOpenClawInputs({
+      before_tool_call: {
+        event: {
+          toolName: 'edit',
+          params: {
+            path: '.env',
+            oldValue: 'src\\templates\\approval-policy.ts',
+            newValue: 'src\\guards\\approval-policy.ts',
+          },
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-edit-value-aliases',
+      },
+    });
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['.env'],
+      summary: 'src\\guards\\approval-policy.ts',
+      operation_type: 'rename-like',
+    });
+    expect(normalized.evaluation_input.raw_text_candidates).toEqual([
+      'src\\guards\\approval-policy.ts',
+      '.env',
+      'src\\templates\\approval-policy.ts',
+    ]);
   });
 
   it.each([
@@ -531,6 +584,25 @@ describe('Sprint 0 input normalization', () => {
         'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n--- a/src\\templates\\ci-template.yml\n+++ b/.github\\workflows\\ci-template.yml\n@@ -1 +1 @@\n-name: Old CI\n+name: New CI',
       operation_type: 'modify',
     });
+  });
+
+  it('normalizes patch_text aliases into workspace context and patch path extraction', () => {
+    const normalized = normalizeOpenClawInputs(
+      buildApplyPatchArgs({
+        patch_text:
+          '*** Begin Patch\n*** Update File: src\\generated\\feature-flags.ts\n+export const featureFlag = true;\n*** End Patch\n',
+      }),
+    );
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\generated\\feature-flags.ts'],
+      summary:
+        '*** Begin Patch\n*** Update File: src\\generated\\feature-flags.ts\n+export const featureFlag = true;\n*** End Patch',
+      operation_type: 'insert',
+    });
+    expect(normalized.evaluation_input.raw_text_candidates).toContain(
+      '*** Begin Patch\n*** Update File: src\\generated\\feature-flags.ts\n+export const featureFlag = true;\n*** End Patch',
+    );
   });
 
   it('merges structured paths with patch-extracted paths without duplicates', () => {
