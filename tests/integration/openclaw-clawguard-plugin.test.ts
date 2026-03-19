@@ -1607,6 +1607,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     const persistHandler = createToolResultPersistHandler(state);
     const dashboardRoute = createDashboardRoute(state);
     const checkupRoute = createCheckupRoute(state);
+    const auditRoute = createAuditRoute(state);
     const workspaceEvent = createWorkspaceWriteEvent({
       path: 'src\\generated\\feature-flags.ts',
       content: 'export const featureFlag = true;\n',
@@ -1663,6 +1664,25 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(checkupHtmlResponse.body).toContain('Outbound route mode:</strong> explicit');
     expect(checkupHtmlResponse.body).toContain(
       'Outbound route:</strong> https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+    );
+
+    const auditHtmlResponse = createMockResponse();
+    auditRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/audit',
+      } as never,
+      auditHtmlResponse as never,
+    );
+
+    expect(auditHtmlResponse.statusCode).toBe(200);
+    expect(auditHtmlResponse.body).toContain('Latest workspace result state in recent replay:');
+    expect(auditHtmlResponse.body).toContain(
+      'Latest workspace result state in recent replay:</strong> insert <small>(parsed from the latest replay detail, not the live queue)</small>',
+    );
+    expect(auditHtmlResponse.body).toContain('Latest outbound route in recent replay:');
+    expect(auditHtmlResponse.body).toContain(
+      'Latest outbound route in recent replay:</strong> https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
     );
   });
 

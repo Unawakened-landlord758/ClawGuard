@@ -59,6 +59,7 @@ type TimelineFlow = {
   readonly runId?: string;
   readonly origin: string;
   readonly riskDecision: string;
+  readonly workspaceState?: string;
   readonly outboundRoute?: string;
   readonly routeMode?: RouteMode;
   readonly systemAction: string;
@@ -354,6 +355,7 @@ function buildTimelineFlow(flowId: string, entries: AuditEntry[]): TimelineFlow 
     ...(runId ? { runId } : {}),
     origin,
     riskDecision: summarizeFlowRiskDecision(entries),
+    ...(workspaceState ? { workspaceState } : {}),
     ...(outboundRoute ? { outboundRoute } : {}),
     ...(routeMode ? { routeMode } : {}),
     systemAction: summarizeFlowSystemAction(entries),
@@ -433,6 +435,16 @@ function findLatestOutboundRoute(flows: TimelineFlow[]): string | undefined {
   for (const flow of flows) {
     if (flow.outboundRoute) {
       return flow.outboundRoute;
+    }
+  }
+
+  return undefined;
+}
+
+function findLatestWorkspaceResultState(flows: TimelineFlow[]): string | undefined {
+  for (const flow of flows) {
+    if (flow.workspaceState) {
+      return flow.workspaceState;
     }
   }
 
@@ -643,6 +655,7 @@ function formatTimestamp(value: string): string {
 
 function renderAuditPage(payload: AuditTimelinePayload): string {
   const latestOutboundRoute = findLatestOutboundRoute(payload.timeline.flows);
+  const latestWorkspaceResultState = findLatestWorkspaceResultState(payload.timeline.flows);
   const flowCards = payload.timeline.flows
     .map(
       (flow) => `
@@ -775,6 +788,7 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
       <p>Replay the fake-only audit entries ClawGuard already captured. Dashboard is the status view, Checkup is the explanation view, Approvals is the action view, and Audit reconstructs what actually happened over time.</p>
       <p>${renderAuditLiveQueueHintCopy()}</p>
       ${latestOutboundRoute ? `<p><strong>Latest outbound route in recent replay:</strong> ${escapeHtml(latestOutboundRoute)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
+      ${latestWorkspaceResultState ? `<p><strong>Latest workspace result state in recent replay:</strong> ${escapeHtml(latestWorkspaceResultState)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       <p><strong>Current posture:</strong> ${escapeHtml(INSTALL_DEMO.demoPosture)}</p>
       <p><strong>Navigation posture:</strong> ${escapeHtml(INSTALL_DEMO.navigationPosture)}</p>
     </section>
