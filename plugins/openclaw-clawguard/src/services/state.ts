@@ -853,6 +853,8 @@ function normalizeWorkspaceResultStateLabel(operationType: string | undefined): 
       return 'modify';
     case 'move':
     case 'moved':
+    case 'copy':
+    case 'copied':
     case 'rename':
     case 'renamed':
     case 'rename-like':
@@ -1081,10 +1083,13 @@ const StructuredResultFieldAliases = {
 const StructuredRenameFieldAliases = [
   'renamed',
   'moved',
+  'copied',
   'renamedPaths',
   'renamed_paths',
   'movedPaths',
   'moved_paths',
+  'copiedPaths',
+  'copied_paths',
 ] as const;
 
 function summarizeStructuredResultFieldValue(value: unknown): string | undefined {

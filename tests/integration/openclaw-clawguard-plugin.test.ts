@@ -1843,6 +1843,75 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('canonicalizes copied aliases into workspace rename-like closure detail', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          operationType: 'copied',
+          copiedPaths: [
+            {
+              sourcePath: 'src\\legacy.ts',
+              targetPath: 'src\\clawguard.ts',
+            },
+          ],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: operation type=copied; tool result status=completed; workspace result state=rename-like via operation_type; renamed=src\\legacy.ts -> src\\clawguard.ts',
+    );
+  });
+
+  it('does not promote no-op copied aliases into workspace rename-like closure detail', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          copied: [
+            {
+              sourcePath: 'src\\legacy.ts',
+              targetPath: 'src\\legacy.ts',
+            },
+          ],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed',
+    );
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).not.toContain(
+      'workspace result state=rename-like',
+    );
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).not.toContain('renamed=');
+  });
+
   it('surfaces workspace result state in audit replay titles after tool_result_persist closes the flow', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
