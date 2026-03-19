@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils.js';
+import type { LivePendingActionStatus } from '../types.js';
 
 export const DASHBOARD_ROUTE_PATH = '/plugins/clawguard/dashboard';
 export const CHECKUP_ROUTE_PATH = '/plugins/clawguard/checkup';
@@ -88,6 +89,20 @@ const CONTROL_SURFACE_SCOPE =
   'These pages reorganize the same bounded approval, posture, and audit signals only. They do not add new hooks, broader outbound coverage, or extra workspace capture.';
 const CONTROL_SURFACE_RELATIONSHIP =
   'Dashboard = status · Checkup = explanation · Approvals = action · Audit = replay.';
+const APPROVALS_QUEUE_BOUNDARY_COPY =
+  'This page only shows live queue states: pending and approved_waiting_retry. Once a flow lands in denied, expired, consumed, or evicted, it leaves this queue and is only explainable from Audit replay.';
+const APPROVALS_PENDING_HANDOFF_COPY =
+  'This stays in the live queue until someone approves or denies it here. After that live step closes, inspect Audit for the final replay outcome.';
+const APPROVALS_RETRY_HANDOFF_COPY =
+  'This is the handoff state between Approvals and Audit. Retry the same tool call once, then inspect Audit for the final allowed, blocked, or failed ending after it leaves the live queue.';
+const APPROVALS_TO_AUDIT_HANDOFF_COPY =
+  'This is the approvals-to-audit handoff. Retry the same fake-only tool call once outside this page, then check Audit for the final allowed, blocked, or failed outcome.';
+const AUDIT_APPROVALS_CLOSED_HANDOFF_COPY =
+  'This replay started in Approvals. The live queue handoff is over; inspect the final outcome here.';
+const AUDIT_DIRECT_HANDOFF_COPY =
+  'This replay did not originate from Approvals, so Audit is the primary place to inspect the recorded ending.';
+const AUDIT_LIVE_QUEUE_HINT_COPY =
+  `If a replay says <strong>Waiting for decision</strong> or <strong>Waiting for approved retry</strong>, the flow is still live in <a href="${APPROVALS_ROUTE_PATH}">Approvals</a>. Once it leaves the live queue, inspect the final outcome here.`;
 
 const OPERATOR_ACTIONS: Record<OperatorActionId, OperatorActionDefinition> = {
   'review-approvals': {
@@ -209,6 +224,37 @@ export function renderLifecycleHandoffCopy(mode: ControlSurfaceHandoffMode): str
     case 'checkup':
       return 'When an item is still live, continue to Approvals to act on it; when it has already closed, continue to Audit for the final replay trail.';
   }
+}
+
+export function renderApprovalsQueueBoundaryCopy(): string {
+  return APPROVALS_QUEUE_BOUNDARY_COPY;
+}
+
+export function renderApprovalsHandoffCopy(status: LivePendingActionStatus): string {
+  switch (status) {
+    case 'pending':
+      return APPROVALS_PENDING_HANDOFF_COPY;
+    case 'approved_waiting_retry':
+      return APPROVALS_RETRY_HANDOFF_COPY;
+  }
+}
+
+export function renderApprovalsToAuditHandoffCopy(): string {
+  return APPROVALS_TO_AUDIT_HANDOFF_COPY;
+}
+
+export function renderAuditLiveQueueHintCopy(): string {
+  return AUDIT_LIVE_QUEUE_HINT_COPY;
+}
+
+export function renderAuditFlowHandoffCopy(origin: 'approvals' | 'direct', isStillLive: boolean): string {
+  if (origin === 'approvals') {
+    return isStillLive
+      ? `This replay started in ${renderOperatorActionLink(getOperatorAction('review-approvals'), 'Approvals')}. Use the live queue for the next operator step, then return here for final closure.`
+      : AUDIT_APPROVALS_CLOSED_HANDOFF_COPY;
+  }
+
+  return AUDIT_DIRECT_HANDOFF_COPY;
 }
 
 export function getOperatorAction(id: OperatorActionId): OperatorActionLink {

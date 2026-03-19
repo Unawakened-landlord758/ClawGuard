@@ -1183,7 +1183,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
         result: {
           status: 'completed',
           persisted: true,
-          paths: ['src\\generated\\feature-flags.ts'],
+          created: ['src\\generated\\feature-flags.ts'],
         },
       },
       context,
@@ -1196,7 +1196,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     });
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain('Final outcome allowed after execution.');
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
-      'Result detail: tool result status=completed; paths=src\\generated\\feature-flags.ts',
+      'Result detail: tool result status=completed; created=src\\generated\\feature-flags.ts',
     );
   });
 
@@ -1636,7 +1636,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
         },
         hiddenTerminalStates: ['denied', 'expired', 'consumed', 'evicted'],
         boundaryNote:
-          'This page only shows live queue states: pending and approved_waiting_retry. Once a flow lands in denied, expired, consumed, or evicted, it leaves this queue and stays explainable from Audit replay.',
+          'This page only shows live queue states: pending and approved_waiting_retry. Once a flow lands in denied, expired, consumed, or evicted, it leaves this queue and is only explainable from Audit replay.',
       },
       stateGuide: [
         {

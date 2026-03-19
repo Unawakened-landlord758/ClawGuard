@@ -8,11 +8,11 @@ import {
   CHECKUP_ROUTE_PATH,
   DASHBOARD_ROUTE_PATH,
   INSTALL_DEMO,
-  getOperatorAction,
+  renderAuditFlowHandoffCopy,
+  renderAuditLiveQueueHintCopy,
   renderClawGuardNav,
   renderControlSurfaceIntro,
   renderInstallDemoPostureNote,
-  renderOperatorActionLink,
 } from './shared.js';
 
 type AuditKindGuide = {
@@ -95,8 +95,6 @@ type AuditTimelinePayload = {
     readonly flows: TimelineFlow[];
   };
 };
-
-const APPROVALS_ACTION = getOperatorAction('review-approvals');
 
 const AUDIT_KIND_GUIDE: Record<AuditEntryKind, AuditKindGuide> = {
   risk_hit: {
@@ -588,10 +586,12 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
           </header>
           <p class="audit-flow__handoff">${
             flow.origin === 'Approvals queue'
-              ? flow.finalOutcome === 'Waiting for decision' || flow.finalOutcome === 'Waiting for approved retry'
-                ? `This replay started in ${renderOperatorActionLink(APPROVALS_ACTION, 'Approvals')}. Use that live queue for the next operator step, then return to this replay for closure.`
-                : 'This replay started in Approvals. The live queue handoff is over; inspect the final outcome shown here for closure.'
-              : 'This replay did not originate from Approvals, so Audit is the primary place to inspect the recorded ending.'
+              ? renderAuditFlowHandoffCopy(
+                  'approvals',
+                  flow.finalOutcome === 'Waiting for decision' ||
+                    flow.finalOutcome === 'Waiting for approved retry',
+                )
+              : renderAuditFlowHandoffCopy('direct', false)
           }</p>
           <ol class="audit-events">
             ${flow.events
@@ -690,7 +690,7 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
     ${renderInstallDemoPostureNote()}
     <section class="hero">
       <p>Replay the fake-only audit entries ClawGuard already captured. Dashboard is the status view, Checkup is the explanation view, Approvals is the action view, and Audit reconstructs what actually happened over time.</p>
-      <p>If a replay says <strong>Waiting for decision</strong> or <strong>Waiting for approved retry</strong>, the flow is still live in <a href="${APPROVALS_ROUTE_PATH}">Approvals</a>. Once it leaves the live queue, inspect the final outcome here.</p>
+      <p>${renderAuditLiveQueueHintCopy()}</p>
       <p><strong>Current posture:</strong> ${escapeHtml(INSTALL_DEMO.demoPosture)}</p>
       <p><strong>Navigation posture:</strong> ${escapeHtml(INSTALL_DEMO.navigationPosture)}</p>
     </section>

@@ -11,6 +11,9 @@ import {
   getOperatorAction,
   renderClawGuardNav,
   renderControlSurfaceIntro,
+  renderApprovalsHandoffCopy,
+  renderApprovalsQueueBoundaryCopy,
+  renderApprovalsToAuditHandoffCopy,
   renderInstallDemoPostureNote,
   renderOperatorActionLink,
 } from './shared.js';
@@ -41,9 +44,6 @@ const LIVE_STATE_GUIDE: ApprovalStateGuide[] = [
       `Retry the same tool call once, then use ${AUDIT_REPLAY_ACTION.label.toLowerCase()} to confirm the final result. No second approval is available from this live state.`,
   },
 ] as const;
-
-const TERMINAL_STATE_BOUNDARY =
-  'This page only shows live queue states: pending and approved_waiting_retry. Once a flow lands in denied, expired, consumed, or evicted, it leaves this queue and stays explainable from Audit replay.';
 
 function endHtml(res: ServerResponse, statusCode: number, body: string): true {
   res.statusCode = statusCode;
@@ -156,11 +156,7 @@ function renderAuditFlowLink(pendingActionId: string, label: string): string {
 }
 
 function describeWhereToLookNext(entry: PendingAction): string {
-  if (entry.status === 'pending') {
-    return `This stays in the live queue until someone approves or denies it here. After that live step closes, inspect ${AUDIT_REPLAY_ACTION.label.toLowerCase()} for the final replay outcome.`;
-  }
-
-  return `This is the handoff state between Approvals and Audit. Retry the same tool call once, then inspect the audit replay for the final allowed, blocked, or failed ending after it leaves the live queue.`;
+  return renderApprovalsHandoffCopy(entry.status);
 }
 
 function renderStateGuide(): string {
@@ -244,7 +240,7 @@ function buildApprovalsPayload(state: ClawGuardState) {
         audit: AUDIT_ROUTE_PATH,
       },
       hiddenTerminalStates: ['denied', 'expired', 'consumed', 'evicted'],
-      boundaryNote: TERMINAL_STATE_BOUNDARY,
+      boundaryNote: renderApprovalsQueueBoundaryCopy(),
     },
     stateGuide: LIVE_STATE_GUIDE,
   };
@@ -277,7 +273,7 @@ function renderApprovalsPage(state: ClawGuardState): string {
       <h2>Live queue summary</h2>
       <p><strong>${payload.summary.pending}</strong> waiting for a decision · <strong>${payload.summary.approvedWaitingRetry}</strong> approved and waiting for one retry · <strong>${payload.summary.totalLive}</strong> live items total</p>
       <p>Approval TTL: ${payload.summary.approvalTtlSeconds} seconds · Pending action limit: ${payload.summary.pendingActionLimit}</p>
-      <p>${escapeHtml(TERMINAL_STATE_BOUNDARY)}</p>
+      <p>${escapeHtml(renderApprovalsQueueBoundaryCopy())}</p>
     </section>
     <section>
       <h2>Queue boundary</h2>
@@ -300,12 +296,12 @@ function renderApprovalsPage(state: ClawGuardState): string {
     </section>
     <section>
       <h2>Approved, waiting for retry</h2>
-      <p>This is the approvals-to-audit handoff. The operator retriggers the same fake-only tool call outside this page, then checks Audit for the final allowed, blocked, or failed outcome.</p>
-      ${approvedWaitingRetryItems || `<p>No approved actions are waiting for their single retry right now. When one appears, the next steps stay lightweight: retry once, then jump to <a href="${AUDIT_ROUTE_PATH}">Audit</a> for closure.</p>`}
+      <p>${escapeHtml(renderApprovalsToAuditHandoffCopy())}</p>
+      ${approvedWaitingRetryItems || `<p>No approved actions are waiting for their single retry right now. When one appears, the next steps stay lightweight: retry once, then jump to <a href="${AUDIT_ROUTE_PATH}">Audit</a> for final closure.</p>`}
     </section>
     <section>
       <h2>Not shown here</h2>
-      <p>${escapeHtml(TERMINAL_STATE_BOUNDARY)} Start from <a href="${AUDIT_ROUTE_PATH}">Audit</a> when the question is "how did this earlier approval path end?" rather than "what live operator action is still waiting?"</p>
+      <p>${escapeHtml(renderApprovalsQueueBoundaryCopy())} Start from <a href="${AUDIT_ROUTE_PATH}">Audit</a> when the question is "how did this earlier approval path end?" rather than "what live operator action is still waiting?"</p>
     </section>
   </body>
 </html>`;
