@@ -133,7 +133,7 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.evaluation_input.destination).toEqual({
       kind: 'session',
       target: 'public-room',
-      thread: undefined,
+      target_mode: 'explicit',
     });
     expect(result.policy_decision.decision).toBe(ResponseAction.Block);
     expect(result.routing.pipeline_kind).toBe(PipelineKind.Outbound);
@@ -142,6 +142,50 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.risk_event.status).toBe(RiskEventStatus.Blocked);
     expect(result.audit_record.execution_result).toBe('blocked');
     expect(result.audit_record.final_status).toBe(AuditRecordFinalStatus.Blocked);
+  });
+
+  it('surfaces direct host outbound route context in outbound summaries, explanations, and impact scope', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'message_sending',
+          params: {
+            to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+            message: 'daily build finished successfully',
+            channelId: 'slack',
+            accountId: 'default',
+            conversationId: 'C123',
+            thread: '1111.2222',
+          },
+          runId: 'run-host-route-1',
+          toolCallId: 'tool-host-route-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-host-route',
+      },
+    });
+
+    expect(result.evaluation_input.destination).toEqual({
+      kind: 'channel',
+      target: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+      thread: '1111.2222',
+      channel: 'slack',
+      account: 'default',
+      conversation: 'C123',
+      target_mode: 'explicit',
+    });
+    expect(result.rule_matches.map((match) => match.rule_id)).toContain('destination.public-webhook-url');
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      impact_scope:
+        'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222)',
+    });
+    expect(result.risk_event.summary).toContain('Detected a public webhook destination.');
+    expect(result.risk_event.explanation).toContain(
+      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222).',
+    );
   });
 
   it('routes apply_patch through the workspace mutation pipeline', () => {
@@ -189,6 +233,74 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.risk_event.risk_domain).toBe(RiskDomain.Execution);
     expect(result.risk_event.status).toBe(RiskEventStatus.Allowed);
     expect(result.audit_record.final_status).toBe(AuditRecordFinalStatus.Allowed);
+  });
+
+  it('treats a pure insert update hunk as insert semantics in the approval surface', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'apply_patch',
+          params: {
+            patch:
+              '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** End Patch\n',
+          },
+          runId: 'run-patch-insert-1',
+          toolCallId: 'tool-patch-insert-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-patch-insert',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['.env'],
+      summary:
+        '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** End Patch',
+      operation_type: 'insert',
+    });
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (insert)',
+      impact_scope: '.env',
+    });
+    expect(result.risk_event.summary).toContain('Operation type: insert.');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=insert.');
+  });
+
+  it('falls back to modify when update hunks conflict across files', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'apply_patch',
+          params: {
+            patch:
+              '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** Update File: src\\generated\\feature-flags.ts\n@@\n-export const featureFlag = false;\n*** End Patch\n',
+          },
+          runId: 'run-patch-conflict-1',
+          toolCallId: 'tool-patch-conflict-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-patch-conflict',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['.env', 'src\\generated\\feature-flags.ts'],
+      summary:
+        '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** Update File: src\\generated\\feature-flags.ts\n@@\n-export const featureFlag = false;\n*** End Patch',
+      operation_type: 'modify',
+    });
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (modify)',
+      impact_scope: '.env, src\\generated\\feature-flags.ts',
+    });
+    expect(result.risk_event.summary).toContain('Operation type: modify.');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=modify.');
   });
 
   it('surfaces high-confidence path-pair rename-like semantics in workspace approvals and audit artifacts', () => {
@@ -430,6 +542,24 @@ describe('OpenClaw adapter pipeline', () => {
       expectedFinalStatus: AuditRecordFinalStatus.Logged,
     },
     {
+      caseId: 'github-action',
+      label: '.github action',
+      patchPath: '.github\\actions\\release\\action.yml',
+      expectedRuleId: 'path.repo.workflow',
+      expectedDecision: ResponseAction.ApproveRequired,
+      expectedStatus: RiskEventStatus.PendingApproval,
+      expectedFinalStatus: AuditRecordFinalStatus.Logged,
+    },
+    {
+      caseId: 'pyproject',
+      label: 'pyproject config',
+      patchPath: 'pyproject.toml',
+      expectedRuleId: 'path.workspace.config',
+      expectedDecision: ResponseAction.ApproveRequired,
+      expectedStatus: RiskEventStatus.PendingApproval,
+      expectedFinalStatus: AuditRecordFinalStatus.Logged,
+    },
+    {
       caseId: 'ssh-config',
       label: '.ssh config',
       patchPath: '.ssh\\config',
@@ -633,6 +763,50 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.approval_request).toBeUndefined();
     expect(result.risk_event.recommended_action).toBe(ResponseAction.Warn);
     expect(result.risk_event.explanation).toContain('not treated as an obviously malicious endpoint');
+  });
+
+  it('requires approval when an implicit session delivery context resolves to a public webhook destination', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'message',
+          params: {
+            message: 'daily build finished successfully',
+          },
+          runId: 'run-destination-implicit-1',
+          toolCallId: 'tool-destination-implicit-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-destination-implicit',
+        deliveryContext: {
+          channel: 'slack',
+          to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+          accountId: 'default',
+          threadId: '1111.2222',
+        },
+      },
+    });
+
+    expect(result.evaluation_input.destination).toEqual({
+      kind: 'channel',
+      target: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+      thread: '1111.2222',
+      channel: 'slack',
+      account: 'default',
+      target_mode: 'implicit',
+    });
+    expect(result.rule_matches.map((match) => match.rule_id)).toContain('destination.public-webhook-url');
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      impact_scope:
+        'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default (thread 1111.2222)',
+    });
+    expect(result.risk_event.explanation).toContain(
+      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default (thread 1111.2222).',
+    );
+    expect(result.risk_event.explanation).toContain('Target mode=implicit.');
   });
 
   it('keeps a generic public URL as a secondary explanation when secret content is the primary outbound risk', () => {

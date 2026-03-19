@@ -142,7 +142,7 @@ Please read this repo with the current scope in mind:
 - **not a formal release**
 - **not presented as GA or a complete product**
 - **outbound coverage is still minimal**
-- **host-level outbound keeps hard blocks on `message_sending` and closes allowed / failed delivery on `message_sent`, while tool-level approvals stay on `message` / `sessions_send`; these are still two minimal fake-only review points, not full outbound lifecycle coverage**
+- **host-level direct outbound cannot enter the pending approval loop, so `message_sending` stays on the hard-block path for both `approve_required` and `block` cases; `message_sent` only closes sends that were actually allowed to leave the host, while tool-level approvals stay on `message` / `sessions_send`; these are still minimal fake-only review points, not full outbound lifecycle coverage**
 - **the approval loop is still a pending-action + allow-once-retry demo flow**
 - **the built-in Control UI sidebar is currently core-owned and hard-coded; there is no official plugin nav registration API for a `Security` tab yet**
 - **current UI integration therefore relies on direct plugin routes such as `/plugins/clawguard/dashboard`, `/plugins/clawguard/checkup`, `/plugins/clawguard/approvals`, `/plugins/clawguard/audit`, and `/plugins/clawguard/settings`**

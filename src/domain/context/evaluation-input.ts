@@ -19,6 +19,10 @@ export interface EvaluationDestination {
   readonly kind: 'channel' | 'session' | 'workspace' | 'unknown';
   readonly target?: string;
   readonly thread?: string;
+  readonly channel?: string;
+  readonly account?: string;
+  readonly conversation?: string;
+  readonly target_mode?: 'explicit' | 'implicit';
 }
 
 export interface WorkspaceContext {

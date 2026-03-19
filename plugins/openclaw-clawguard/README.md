@@ -16,12 +16,12 @@ This install demo currently covers:
 
 - risky `exec`
 - minimal outbound coverage
-- minimal workspace mutation coverage for `write` / `edit` / `apply_patch` actions, with alpha-safe checks for key config files, repo automation metadata, and obvious out-of-workspace writes; this is the current demo surface, not broad workspace coverage
+- minimal workspace mutation coverage for `write` / `edit` / `apply_patch` actions, with alpha-safe checks for key config files, repo automation metadata, obvious out-of-workspace writes, and a workspace-only `tool_result_persist` fallback for result closure; this is the current demo surface, not broad workspace coverage
 - a plugin-owned dashboard at `/plugins/clawguard/dashboard`, a deeper safety checkup at `/plugins/clawguard/checkup`, plus supporting `/plugins/clawguard/approvals`, `/plugins/clawguard/audit`, and `/plugins/clawguard/settings` pages
 
 Current limitation:
 
-- host-level outbound now keeps hard blocks on `message_sending` and closes allowed / failed delivery on `message_sent`, while approval ownership stays on tool-level `message` / `sessions_send`
+- host-level direct outbound cannot enter the pending approval loop, so `message_sending` stays on the hard-block path for both `approve_required` and `block` cases; `message_sent` only closes sends that were actually allowed to leave the host, while approval ownership stays on tool-level `message` / `sessions_send`
 - these outbound points are intentionally minimal and fake-only; they should not be described as complete outbound lifecycle coverage
 
 ## Recommended install method: local path from repo root
@@ -132,7 +132,8 @@ Ask OpenClaw to run a clearly risky shell action. Expected result:
 Ask OpenClaw to send a risky outbound message. Expected result:
 
 - tool-level outbound coverage remains minimal
-- direct host outbound matches currently rely on the `message_sending` hard block path
+- tool-level outbound can now explain both explicit targets and implicit session delivery routes, but this is still the current fake-only minimal review surface rather than full delivery governance
+- direct host outbound matches currently rely on the `message_sending` hard-block path because host-level sends do not enter the pending approval loop
 - the event should be visible through the demo pages and audit trail
 
 ### 3. Workspace mutation risk
@@ -151,7 +152,7 @@ Ask OpenClaw to perform a risky file change such as a suspicious `write`, `edit`
 - no registry publish should be implied
 - no real dangerous execution or real outbound verification should be implied
 - outbound coverage is still intentionally minimal
-- host-level outbound keeps hard blocks on `message_sending` and closes allowed / failed delivery on `message_sent`, while approval ownership stays on tool-level `message` / `sessions_send`
+- host-level direct outbound cannot enter the pending approval loop, so `message_sending` stays on the hard-block path for both `approve_required` and `block` cases; `message_sent` only closes sends that were actually allowed to leave the host, while approval ownership stays on tool-level `message` / `sessions_send`
 - workspace mutation heuristics remain intentionally small and fake-only: they only add explainable checks for key config files, repo automation metadata, and obvious out-of-workspace writes
 - the built-in Control UI sidebar is still core-owned and hard-coded; there is no official plugin API to register a left-nav `Security` tab yet
 - any future `Security` entry in Control UI therefore likely means either a custom/patched Control UI build or a future upstream plugin-nav capability

@@ -12,6 +12,7 @@ import {
   type RunRef,
   type SessionRef,
   type ToolCallRef,
+  WorkspaceMutationOperationType,
 } from '../../domain/shared/index.js';
 import { createStableId, systemClock, toIsoTimestamp, type RuntimeClock } from '../../shared/index.js';
 import type { OpenClawAgentEventInput } from './agent-event.js';
@@ -38,7 +39,11 @@ export function normalizeOpenClawInputs(args: NormalizeOpenClawInputsArgs): Norm
   const run_ref = normalizeRunRef(args.before_tool_call, args.agent_event, session_ref, clock);
   const tool_call_ref = normalizeToolCallRef(args.before_tool_call, args.agent_event, run_ref);
   const origin = normalizeOrigin(args.session_policy);
-  const destination = normalizeDestination(args.before_tool_call.event.toolName, args.before_tool_call.event.params);
+  const destination = normalizeDestination(
+    args.before_tool_call.event.toolName,
+    args.before_tool_call.event.params,
+    args.session_policy,
+  );
   const workspace_context = normalizeWorkspaceContext(args.before_tool_call.event.toolName, args.before_tool_call.event.params);
   const raw_text_candidates = collectRawTextCandidates(args.before_tool_call.event.params);
   const agent_event = normalizeAgentEvent(args.agent_event, tool_call_ref.tool_status, clock);
@@ -153,6 +158,7 @@ function normalizeOrigin(sessionPolicy: OpenClawSessionPolicyInput): EvaluationO
 function normalizeDestination(
   toolName: string,
   toolParams: Record<string, unknown>,
+  sessionPolicy: OpenClawSessionPolicyInput,
 ): EvaluationDestination | undefined {
   const normalizedToolName = normalizeToolName(toolName);
   const isOutboundTool =
@@ -163,13 +169,64 @@ function normalizeDestination(
     return undefined;
   }
 
-  const target = firstString(toolParams, ['to', 'recipient', 'destination', 'channelId', 'conversationId']);
-  const thread = firstString(toolParams, ['thread', 'threadId']);
+  const explicitTarget = firstString(toolParams, ['to', 'recipient', 'destination', 'conversationId', 'channelId']);
+  const explicitThread = firstString(toolParams, ['thread', 'threadId']);
+  const explicitChannel = firstString(toolParams, ['channelId']);
+  const explicitAccount = firstString(toolParams, ['accountId']);
+  const explicitConversation = firstString(toolParams, ['conversationId']);
+  const fallbackDeliveryContext = normalizeSessionDeliveryContext(sessionPolicy);
+
+  const target = explicitTarget ?? fallbackDeliveryContext?.to;
+  const thread = explicitThread ?? fallbackDeliveryContext?.threadId;
+  const channel = explicitChannel ?? fallbackDeliveryContext?.channel;
+  const account = explicitAccount ?? fallbackDeliveryContext?.accountId;
+  const conversation = explicitConversation;
+  const targetMode = explicitTarget ? 'explicit' : fallbackDeliveryContext?.to ? 'implicit' : undefined;
+
+  if (!target && !thread && !channel && !account && !conversation) {
+    return undefined;
+  }
 
   return {
     kind: normalizedToolName === 'sessions_send' ? 'session' : 'channel',
     target,
-    thread,
+    ...(thread ? { thread } : {}),
+    ...(channel ? { channel } : {}),
+    ...(account ? { account } : {}),
+    ...(conversation ? { conversation } : {}),
+    ...(targetMode ? { target_mode: targetMode } : {}),
+  };
+}
+
+function normalizeSessionDeliveryContext(
+  sessionPolicy: OpenClawSessionPolicyInput,
+): {
+  readonly channel?: string;
+  readonly to?: string;
+  readonly accountId?: string;
+  readonly threadId?: string;
+} | undefined {
+  if (!sessionPolicy.deliveryContext) {
+    return undefined;
+  }
+
+  const channel = normalizeOptionalString(sessionPolicy.deliveryContext.channel);
+  const to = normalizeOptionalString(sessionPolicy.deliveryContext.to);
+  const accountId = normalizeOptionalString(sessionPolicy.deliveryContext.accountId);
+  const threadId =
+    sessionPolicy.deliveryContext.threadId !== undefined
+      ? normalizeOptionalString(String(sessionPolicy.deliveryContext.threadId))
+      : undefined;
+
+  if (!channel && !to && !accountId && !threadId) {
+    return undefined;
+  }
+
+  return {
+    ...(channel ? { channel } : {}),
+    ...(to ? { to } : {}),
+    ...(accountId ? { accountId } : {}),
+    ...(threadId ? { threadId } : {}),
   };
 }
 
@@ -185,6 +242,7 @@ function normalizeWorkspaceContext(
   }
 
   const patchText = firstString(toolParams, ['patch', 'patchText']);
+  const operationType = resolveWorkspaceMutationOperationType(normalizedToolName, toolParams, patchText);
   const candidatePaths = dedupeStrings([
     ...readStringsFromKeys(toolParams, ['path', 'filePath', 'patchPath', 'fromPath', 'toPath', 'oldPath', 'newPath']),
     ...readStringArray(toolParams.paths),
@@ -194,8 +252,115 @@ function normalizeWorkspaceContext(
   return {
     paths: candidatePaths,
     summary: firstString(toolParams, ['patch', 'patchText', 'content', 'newText', 'new_string', 'oldText', 'old_string']),
-    operation_type: detectWorkspaceMutationOperationType(normalizedToolName, toolParams),
+    operation_type: operationType,
   };
+}
+
+function resolveWorkspaceMutationOperationType(
+  normalizedToolName: string,
+  toolParams: Record<string, unknown>,
+  patchText: string | undefined,
+): WorkspaceMutationOperationType | undefined {
+  const baseOperationType = detectWorkspaceMutationOperationType(normalizedToolName, toolParams);
+  if (normalizedToolName !== 'apply_patch' || baseOperationType !== 'modify' || !patchText) {
+    return baseOperationType;
+  }
+
+  return detectApplyPatchHunkOperationType(patchText) ?? baseOperationType;
+}
+
+function detectApplyPatchHunkOperationType(
+  patchText: string,
+): WorkspaceMutationOperationType | undefined {
+  const fileKinds: WorkspaceMutationOperationType[] = [];
+  let currentFileStarted = false;
+  let currentFileSawHunk = false;
+  let currentFileSawPlus = false;
+  let currentFileSawMinus = false;
+
+  const resetCurrentFile = (): void => {
+    currentFileStarted = false;
+    currentFileSawHunk = false;
+    currentFileSawPlus = false;
+    currentFileSawMinus = false;
+  };
+
+  const flushCurrentFile = (): void => {
+    if (!currentFileStarted) {
+      return;
+    }
+
+    if (!currentFileSawHunk) {
+      fileKinds.push(WorkspaceMutationOperationType.Modify);
+      resetCurrentFile();
+      return;
+    }
+
+    if (currentFileSawPlus && currentFileSawMinus) {
+      fileKinds.push(WorkspaceMutationOperationType.Modify);
+      resetCurrentFile();
+      return;
+    }
+
+    if (currentFileSawPlus) {
+      fileKinds.push(WorkspaceMutationOperationType.Insert);
+      resetCurrentFile();
+      return;
+    }
+
+    if (currentFileSawMinus) {
+      fileKinds.push(WorkspaceMutationOperationType.Delete);
+      resetCurrentFile();
+      return;
+    }
+
+    fileKinds.push(WorkspaceMutationOperationType.Modify);
+    resetCurrentFile();
+  };
+
+  for (const rawLine of patchText.split(/\r?\n/u)) {
+    const line = rawLine.trimEnd();
+
+    if (/^\*\*\* Update File:\s+.+$/u.test(line) || /^diff --git\s+/u.test(line)) {
+      flushCurrentFile();
+      currentFileStarted = true;
+      continue;
+    }
+
+    if (!currentFileStarted) {
+      continue;
+    }
+
+    if (/^@@(?:\s|$)/u.test(line)) {
+      currentFileSawHunk = true;
+      continue;
+    }
+
+    if (currentFileSawHunk && /^\+(?!\+\+)/u.test(line)) {
+      currentFileSawPlus = true;
+      continue;
+    }
+
+    if (currentFileSawHunk && /^-(?!---)/u.test(line)) {
+      currentFileSawMinus = true;
+    }
+  }
+
+  flushCurrentFile();
+
+  if (fileKinds.length === 0) {
+    return undefined;
+  }
+
+  const uniqueKinds = Array.from(new Set(fileKinds));
+  if (uniqueKinds.length !== 1) {
+    return undefined;
+  }
+
+  const [singleKind] = uniqueKinds;
+  return singleKind === WorkspaceMutationOperationType.Insert || singleKind === WorkspaceMutationOperationType.Delete
+    ? singleKind
+    : undefined;
 }
 
 function normalizeAgentEvent(

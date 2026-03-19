@@ -5,6 +5,7 @@ import { createAfterToolCallHandler } from './hooks/after-tool.js';
 import { createBeforeToolCallHandler } from './hooks/before-tool.js';
 import { createMessageSentHandler } from './hooks/message-sent.js';
 import { createMessageSendingHandler } from './hooks/message-sending.js';
+import { createToolResultPersistHandler } from './hooks/tool-result-persist.js';
 import { createApprovalsRoute } from './routes/approvals.js';
 import { createAuditRoute } from './routes/audit.js';
 import { createCheckupRoute } from './routes/checkup.js';
@@ -60,6 +61,9 @@ const plugin = {
 
     api.on('before_tool_call', createBeforeToolCallHandler(state));
     api.on('after_tool_call', createAfterToolCallHandler(state));
+    // Workspace mutations can also close through tool_result_persist when the
+    // host persists a concrete tool result before or instead of after_tool_call.
+    api.on('tool_result_persist', createToolResultPersistHandler(state));
     // Host-level direct sends use message_sending/message_sent; tool-originated
     // message/sessions_send keeps approval ownership on before/after_tool_call.
     api.on('message_sending', createMessageSendingHandler(state));

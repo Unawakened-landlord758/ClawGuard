@@ -39,7 +39,69 @@ describe('Sprint 0 input normalization', () => {
     expect(normalized.evaluation_input.destination).toEqual({
       kind: 'channel',
       target: outboundFixture.expected.destination_target,
-      thread: undefined,
+      target_mode: 'explicit',
+    });
+  });
+
+  it('normalizes direct host outbound route context into destination fields', () => {
+    const normalized = normalizeOpenClawInputs({
+      before_tool_call: {
+        event: {
+          toolName: 'message_sending',
+          params: {
+            to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+            message: 'daily build finished successfully',
+            channelId: 'slack',
+            accountId: 'default',
+            conversationId: 'C123',
+            thread: '1111.2222',
+          },
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-host-outbound',
+      },
+    });
+
+    expect(normalized.evaluation_input.destination).toEqual({
+      kind: 'channel',
+      target: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+      thread: '1111.2222',
+      channel: 'slack',
+      account: 'default',
+      conversation: 'C123',
+      target_mode: 'explicit',
+    });
+  });
+
+  it('normalizes implicit outbound delivery context from the session policy', () => {
+    const normalized = normalizeOpenClawInputs({
+      before_tool_call: {
+        event: {
+          toolName: 'message',
+          params: {
+            message: 'daily build finished successfully',
+          },
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-implicit-outbound',
+        deliveryContext: {
+          channel: 'slack',
+          to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+          accountId: 'default',
+          threadId: '1111.2222',
+        },
+      },
+    });
+
+    expect(normalized.evaluation_input.destination).toEqual({
+      kind: 'channel',
+      target: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+      thread: '1111.2222',
+      channel: 'slack',
+      account: 'default',
+      target_mode: 'implicit',
     });
   });
 
@@ -224,6 +286,54 @@ describe('Sprint 0 input normalization', () => {
       paths: ['src\\risk\\engine.ts'],
       summary:
         '*** Begin Patch\n*** Update File: src\\risk\\engine.ts\n@@\n-export const oldValue = 1;\n+export const oldValue = 2;\n*** End Patch',
+      operation_type: 'modify',
+    });
+  });
+
+  it('classifies update-file hunks with only additions as insert', () => {
+    const normalized = normalizeOpenClawInputs(
+      buildApplyPatchArgs({
+        patch:
+          '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** End Patch\n',
+      }),
+    );
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['.env'],
+      summary:
+        '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** End Patch',
+      operation_type: 'insert',
+    });
+  });
+
+  it('classifies update-file hunks with only deletions as delete', () => {
+    const normalized = normalizeOpenClawInputs(
+      buildApplyPatchArgs({
+        patch:
+          '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n-FEATURE_FLAG=false\n*** End Patch\n',
+      }),
+    );
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['.env'],
+      summary:
+        '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n-FEATURE_FLAG=false\n*** End Patch',
+      operation_type: 'delete',
+    });
+  });
+
+  it('falls back to modify when update-file hunks conflict across files', () => {
+    const normalized = normalizeOpenClawInputs(
+      buildApplyPatchArgs({
+        patch:
+          '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** Update File: src\\generated\\feature-flags.ts\n@@\n-export const featureFlag = false;\n*** End Patch\n',
+      }),
+    );
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['.env', 'src\\generated\\feature-flags.ts'],
+      summary:
+        '*** Begin Patch\n*** Update File: .env\n@@\n ENVIRONMENT=production\n+FEATURE_FLAG=true\n*** Update File: src\\generated\\feature-flags.ts\n@@\n-export const featureFlag = false;\n*** End Patch',
       operation_type: 'modify',
     });
   });

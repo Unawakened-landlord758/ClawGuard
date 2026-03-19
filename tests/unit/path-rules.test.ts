@@ -37,6 +37,30 @@ describe('path rules', () => {
       recommended_action: ResponseAction.ApproveRequired,
     },
     {
+      paths: ['pyproject.toml'],
+      rule_id: 'path.workspace.config',
+      matched_value: 'pyproject.toml',
+      recommended_action: ResponseAction.ApproveRequired,
+    },
+    {
+      paths: ['docker-compose.yml'],
+      rule_id: 'path.workspace.config',
+      matched_value: 'docker-compose.yml',
+      recommended_action: ResponseAction.ApproveRequired,
+    },
+    {
+      paths: ['.github\\actions\\release\\action.yml'],
+      rule_id: 'path.repo.workflow',
+      matched_value: '.github\\actions\\release\\action.yml',
+      recommended_action: ResponseAction.ApproveRequired,
+    },
+    {
+      paths: ['.gitlab-ci.yml'],
+      rule_id: 'path.repo.workflow',
+      matched_value: '.gitlab-ci.yml',
+      recommended_action: ResponseAction.ApproveRequired,
+    },
+    {
       paths: ['..\\outside\\staged.ts'],
       rule_id: 'path.workspace.escape',
       matched_value: '..\\outside\\staged.ts',
@@ -68,15 +92,31 @@ describe('path rules', () => {
   it('reads workspace mutation paths from evaluation input', () => {
     const matches = matchPathRulesForEvaluationInput({
       workspace_context: {
-        paths: ['src\\billing\\invoice-service.ts', '.env.local', '.github\\workflows\\ci.yml', 'C:\\Users\\alice\\.ssh\\config'],
+        paths: [
+          'src\\billing\\invoice-service.ts',
+          '.env.local',
+          '.github\\actions\\release\\action.yml',
+          'pyproject.toml',
+          'C:\\Users\\alice\\.ssh\\config',
+        ],
       },
     });
 
     expect(matches.map((match) => match.rule_id)).toEqual(
-      expect.arrayContaining(['path.critical.config', 'path.secret.material', 'path.repo.workflow']),
+      expect.arrayContaining([
+        'path.critical.config',
+        'path.secret.material',
+        'path.repo.workflow',
+        'path.workspace.config',
+      ]),
     );
     expect(matches.map((match) => match.matched_value)).toEqual(
-      expect.arrayContaining(['.env.local', '.github\\workflows\\ci.yml', 'C:\\Users\\alice\\.ssh\\config']),
+      expect.arrayContaining([
+        '.env.local',
+        '.github\\actions\\release\\action.yml',
+        'pyproject.toml',
+        'C:\\Users\\alice\\.ssh\\config',
+      ]),
     );
   });
 

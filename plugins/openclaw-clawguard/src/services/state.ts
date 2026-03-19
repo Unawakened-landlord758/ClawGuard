@@ -1,4 +1,5 @@
 import {
+  PipelineKind,
   ApprovalActorType,
   ApprovalResultStatus,
   ResponseAction,
@@ -249,7 +250,7 @@ export class ClawGuardState {
     });
     const artifacts = buildHostOutboundEvaluationArtifacts(input, params);
 
-    if (artifacts.policy_decision.decision !== ResponseAction.Block) {
+    if (!shouldHardBlockHostOutbound(artifacts.policy_decision.decision)) {
       return { cancel: false };
     }
 
@@ -283,7 +284,7 @@ export class ClawGuardState {
       params,
     });
     const artifacts = buildHostOutboundEvaluationArtifacts(input, params);
-    if (artifacts.policy_decision.decision === ResponseAction.Block) {
+    if (shouldHardBlockHostOutbound(artifacts.policy_decision.decision)) {
       return;
     }
     const integrated = applyPostExecutionResultToEvaluationArtifacts(artifacts, {
@@ -308,6 +309,23 @@ export class ClawGuardState {
   }
 
   public finalizeAfterToolCall(input: ToolResultSnapshot): void {
+    this.finalizeTrackedToolResult(input, {
+      acceptedPipelines: [PipelineKind.Exec, PipelineKind.Outbound, PipelineKind.WorkspaceMutation],
+    });
+  }
+
+  public finalizeToolResultPersist(input: ToolResultSnapshot): void {
+    this.finalizeTrackedToolResult(input, {
+      acceptedPipelines: [PipelineKind.WorkspaceMutation],
+    });
+  }
+
+  private finalizeTrackedToolResult(
+    input: ToolResultSnapshot,
+    options: {
+      readonly acceptedPipelines: ReadonlyArray<PipelineKind>;
+    },
+  ): void {
     const toolName = normalizeToolName(input.toolName);
     const actionFingerprint = fingerprintAction({
       toolName,
@@ -316,6 +334,10 @@ export class ClawGuardState {
     const correlationKey = buildExecutionCorrelationKey(input, toolName, actionFingerprint);
     const tracked = this.trackedExecutions.get(correlationKey);
     if (!tracked) {
+      return;
+    }
+
+    if (!options.acceptedPipelines.includes(tracked.artifacts.routing.pipeline_kind)) {
       return;
     }
 
@@ -578,7 +600,12 @@ function buildPendingBlockDetail(
 }
 
 function buildHostOutboundBlockDetail(artifacts: EvaluationArtifacts): string {
-  return `Blocked host outbound delivery before channel send. ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
+  const deliveryPosture =
+    artifacts.policy_decision.decision === ResponseAction.ApproveRequired
+      ? 'Direct host outbound cannot enter the pending approval loop, so ClawGuard kept the host send on the hard-block path.'
+      : 'Direct host outbound matched an immediate block rule.'
+
+  return `Blocked host outbound delivery before channel send. ${deliveryPosture} ${artifacts.policy_decision.reason} ${artifacts.risk_event.summary}`.trim();
 }
 
 function buildHostOutboundSummary(input: MessageSentSnapshot): string {
@@ -712,6 +739,9 @@ function buildHostOutboundToolParams(input: MessageSendingSnapshot): Record<stri
   return {
     to: input.to,
     message: input.content,
+    channelId: input.channelId,
+    ...(input.accountId ? { accountId: input.accountId } : {}),
+    ...(input.conversationId ? { conversationId: input.conversationId } : {}),
     ...(thread ? { thread } : {}),
   };
 }
@@ -766,4 +796,8 @@ function normalizeSessionKeySegment(value: string): string {
 
 function normalizeToolName(toolName: string): string {
   return toolName.trim().toLowerCase();
+}
+
+function shouldHardBlockHostOutbound(decision: ResponseAction): boolean {
+  return decision === ResponseAction.Block || decision === ResponseAction.ApproveRequired;
 }

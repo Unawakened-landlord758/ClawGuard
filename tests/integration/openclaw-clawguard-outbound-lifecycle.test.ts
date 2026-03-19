@@ -139,7 +139,7 @@ describe('OpenClaw ClawGuard outbound lifecycle', () => {
     const sendingHandler = createMessageSendingHandler(state);
     const sentHandler = createMessageSentHandler(state);
     const { event, context } = createHostOutboundMessageEvent({
-      content: 'Bearer abcdefghijklmnopqrstuvwxyz123456',
+      content: 'daily build finished successfully',
     });
 
     expect(sendingHandler(event, context)).toBeUndefined();
@@ -159,6 +159,32 @@ describe('OpenClaw ClawGuard outbound lifecycle', () => {
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
       'Final outbound outcome allowed after host delivery.',
     );
+  });
+
+  it('hard-blocks direct host outbound when the content would otherwise require approval', () => {
+    const state = createClawGuardState();
+    const sendingHandler = createMessageSendingHandler(state);
+    const sentHandler = createMessageSentHandler(state);
+    const { event, context } = createHostOutboundMessageEvent({
+      content: 'Bearer abcdefghijklmnopqrstuvwxyz123456',
+    });
+
+    expect(sendingHandler(event, context)).toEqual({ cancel: true });
+    expect(state.pendingActions.list()).toHaveLength(0);
+    expect(getLatestAuditByKind(state, 'blocked')?.detail).toContain(
+      'Direct host outbound cannot enter the pending approval loop',
+    );
+
+    sentHandler(
+      {
+        to: event.to,
+        content: event.content,
+        success: true,
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')).toBeUndefined();
   });
 
   it('closes direct host outbound with a failed outcome after message_sent failure', () => {

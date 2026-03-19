@@ -17,9 +17,11 @@ It does **not** broaden runtime scope. It packages the current codebase and unre
 - OpenClaw native plugin install from local repo path
 - Optional local tarball path for demo packaging only
 - Plugin-owned pages:
-  - `/plugins/clawguard/settings`
+  - `/plugins/clawguard/dashboard`
+  - `/plugins/clawguard/checkup`
   - `/plugins/clawguard/approvals`
   - `/plugins/clawguard/audit`
+  - `/plugins/clawguard/settings`
 - Pending-action + allow-once-retry approval loop
 - Audit closure for the current demo flows
 
@@ -28,8 +30,8 @@ It does **not** broaden runtime scope. It packages the current codebase and unre
 - risky `exec`
 - minimal outbound review points:
   - tool-level `message` / `sessions_send` approval ownership
-  - host-level `message_sending` hard block
-  - `message_sent` result closure
+  - host-level `message_sending` hard block for both `approve_required` and `block` outcomes
+  - `message_sent` result closure only for sends that were actually allowed to leave the host
 - minimal workspace mutation demo surface:
   - `write`
   - `edit`
@@ -55,15 +57,17 @@ It does **not** broaden runtime scope. It packages the current codebase and unre
 ### Smoke
 
 1. Restart OpenClaw
-2. Open `/plugins/clawguard/settings`
-3. Open `/plugins/clawguard/approvals`
-4. Open `/plugins/clawguard/audit`
+2. Open `/plugins/clawguard/dashboard`
+3. Open `/plugins/clawguard/checkup`
+4. Open `/plugins/clawguard/approvals`
+5. Open `/plugins/clawguard/audit`
+6. Open `/plugins/clawguard/settings`
 
 ### Demo order
 
 1. State the posture first: install-demo only / unpublished / fake-only
 2. Show the install command
-3. Smoke the three plugin-owned routes
+3. Smoke the five plugin-owned routes in dashboard-first order
 4. Demo fake-only `exec`
 5. If time allows, add fake-only outbound
 6. If time still allows, add fake-only workspace mutation
@@ -85,7 +89,7 @@ It does **not** broaden runtime scope. It packages the current codebase and unre
 - real dangerous execution
 - real payment or red-packet execution
 - real outbound delivery proof
-- complete outbound lifecycle coverage
+- host-level approvals or complete outbound lifecycle coverage
 - complete workspace coverage
 - native OpenClaw Control UI `Security` nav integration
 - patched UI work, dashboard work, or new host-hook expansion
@@ -94,7 +98,7 @@ It does **not** broaden runtime scope. It packages the current codebase and unre
 
 - Say **first usable version** or **install-demo alpha**, not GA
 - Say **fake-only** whenever demo scenarios are mentioned
-- Say **minimal outbound review points**, not complete outbound lifecycle
+- Say **minimal outbound review points**, not host-level approvals or complete outbound lifecycle
 - Say **workspace mutation demo surface currently means `write` / `edit` / `apply_patch`**, not broad workspace governance
 - Say **direct plugin routes**, not embedded Control UI
 

@@ -55,7 +55,22 @@ const keyWorkspaceConfigFilenames = new Set([
   'yarn.lock',
   'bun.lock',
   'bun.lockb',
+  'pyproject.toml',
+  'poetry.lock',
+  'uv.lock',
+  'requirements.txt',
+  'requirements-dev.txt',
+  'requirements-prod.txt',
   'tsconfig.json',
+  'dockerfile',
+  'docker-compose.yml',
+  'docker-compose.yaml',
+  'compose.yml',
+  'compose.yaml',
+  '.nvmrc',
+  '.python-version',
+  '.tool-versions',
+  '.pre-commit-config.yaml',
 ]);
 
 const pathRuleDefinitions: readonly PathRuleDefinition[] = [
@@ -91,7 +106,14 @@ const pathRuleDefinitions: readonly PathRuleDefinition[] = [
     recommended_action: ResponseAction.ApproveRequired,
     summary: 'Detected a workspace mutation targeting repository workflow automation.',
     reason: 'Workflow definitions can change CI behavior, automation boundaries, and how repository secrets are used.',
-    matches: (candidate) => includesSegmentPair(candidate.segments, '.github', 'workflows'),
+    matches: (candidate) =>
+      includesSegmentPair(candidate.segments, '.github', 'workflows') ||
+      includesSegmentPair(candidate.segments, '.github', 'actions') ||
+      candidate.segments.some((segment) => segment === '.circleci' || segment === '.buildkite') ||
+      hasExactOrNestedPath(candidate.normalized_path, '.gitlab-ci.yml') ||
+      hasExactOrNestedPath(candidate.normalized_path, 'azure-pipelines.yml') ||
+      hasExactOrNestedPath(candidate.normalized_path, 'bitbucket-pipelines.yml') ||
+      hasExactOrNestedPath(candidate.normalized_path, '.github/dependabot.yml'),
   },
   {
     rule_id: 'path.repo.metadata',
@@ -210,11 +232,17 @@ function includesSegmentPair(
   return segments.some((segment, index) => segment === first && segments[index + 1] === second);
 }
 
+function hasExactOrNestedPath(normalizedPath: string, suffix: string): boolean {
+  return normalizedPath === suffix || normalizedPath.endsWith(`/${suffix}`);
+}
+
 function isKeyWorkspaceConfig(basename: string): boolean {
   return (
     keyWorkspaceConfigFilenames.has(basename) ||
     /^tsconfig\.[^.]+(?:\.[^.]+)?\.json$/u.test(basename) ||
-    /^(?:vite|vitest|eslint)\.config\.[cm]?[jt]s$/u.test(basename)
+    /^(?:vite|vitest|eslint)\.config\.[cm]?[jt]s$/u.test(basename) ||
+    /^requirements(?:-[a-z0-9_.-]+)?\.txt$/u.test(basename) ||
+    /^(?:docker|compose)(?:-[a-z0-9_.-]+)?\.(?:ya?ml)$/u.test(basename)
   );
 }
 

@@ -47,6 +47,22 @@ declare module 'openclaw/plugin-sdk/core' {
     readonly agentId?: string;
   }
 
+  export interface ToolResultPersistEvent {
+    readonly toolName: string;
+    readonly params: Record<string, unknown>;
+    readonly runId?: string;
+    readonly toolCallId?: string;
+    readonly result?: unknown;
+    readonly error?: string;
+    readonly durationMs?: number;
+  }
+
+  export interface ToolResultPersistContext {
+    readonly sessionKey?: string;
+    readonly sessionId?: string;
+    readonly agentId?: string;
+  }
+
   export interface MessageSendingEvent {
     readonly to: string;
     readonly content: string;
@@ -80,6 +96,11 @@ declare module 'openclaw/plugin-sdk/core' {
     context: AfterToolCallContext,
   ) => void;
 
+  export type ToolResultPersistHandler = (
+    event: ToolResultPersistEvent,
+    context: ToolResultPersistContext,
+  ) => void;
+
   export type MessageSendingHandler = (
     event: MessageSendingEvent,
     context: MessageSendingContext,
@@ -109,6 +130,7 @@ declare module 'openclaw/plugin-sdk/core' {
     readonly logger: OpenClawPluginLogger;
     on(event: 'before_tool_call', handler: BeforeToolCallHandler): void;
     on(event: 'after_tool_call', handler: AfterToolCallHandler): void;
+    on(event: 'tool_result_persist', handler: ToolResultPersistHandler): void;
     on(event: 'message_sending', handler: MessageSendingHandler): void;
     on(event: 'message_sent', handler: MessageSentHandler): void;
     registerHttpRoute(route: OpenClawRouteDefinition): void;

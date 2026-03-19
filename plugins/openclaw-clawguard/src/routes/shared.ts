@@ -75,7 +75,7 @@ export const INSTALL_DEMO = {
   coverage:
     'Risky exec approvals, minimal outbound checks, and limited workspace mutation heuristics for write / edit / apply_patch. This alpha UI stays fake-only and does not claim broad outbound or workspace coverage.',
   limitations:
-    'Host-level outbound keeps hard blocks on message_sending and closes allowed or failed delivery on message_sent, while tool-level approvals stay on message / sessions_send.',
+    'Host-level direct outbound cannot enter the pending approval loop, so message_sending stays on the hard-block path for both approve_required and block cases; message_sent only closes sends that were actually allowed to leave the host, while tool-level approvals stay on message / sessions_send.',
   navigationPosture:
     'There is no stock Control UI Security tab for this alpha, and ClawGuard does not depend on a patched nav hack.',
 } as const;

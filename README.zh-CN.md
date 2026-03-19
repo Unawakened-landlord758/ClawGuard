@@ -124,7 +124,7 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
 - **不是正式 release**
 - **不能当成 GA 或完整产品发布来理解**
 - **outbound 覆盖仍然是最小版本**
-- **宿主级 outbound 当前只有 `message_sending` hard block，并通过 `message_sent` 回收允许/失败结果；工具级 `message` / `sessions_send` 审批链与它并存，但这仍只是两处最小 fake-only review point，不是完整 outbound 生命周期**
+- **宿主级 direct outbound 目前不能进入 pending approval loop，所以 `message_sending` 在命中 `approve_required` 或 `block` 时都会走 hard block；`message_sent` 只负责回收那些已经真正发出宿主的允许/失败结果；工具级 `message` / `sessions_send` 审批链仍单独保留，但这仍只是最小 fake-only review point，不是完整 outbound 生命周期**
 - **审批闭环当前仍然是 pending-action + allow-once retry 的 demo 形态**
 - **OpenClaw 现有内置 Control UI 里依然没有 stock 的 `Security` 左侧标签；Control UI 内嵌、安全左侧导航、patched UI 等工作明确不在这个 first usable version 范围内；当前仍以直达 `/plugins/clawguard/*` 路由为准**
 - **不应把当前 demo 理解成真实危险执行、真实红包 / 转账执行，或正式发布级验证**

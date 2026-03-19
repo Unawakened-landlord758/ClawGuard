@@ -13,10 +13,12 @@ What you can do today:
 1. Install locally from the repo root with `openclaw plugins install .\plugins\openclaw-clawguard`
 2. Restart OpenClaw
 3. Open:
-   - `/plugins/clawguard/settings`
+   - `/plugins/clawguard/dashboard`
+   - `/plugins/clawguard/checkup`
    - `/plugins/clawguard/approvals`
    - `/plugins/clawguard/audit`
-4. Walk through a narrow fake-only demo across risky `exec`, minimal outbound review points, and workspace mutation actions currently limited to `write` / `edit` / `apply_patch`
+   - `/plugins/clawguard/settings`
+4. Walk through a narrow fake-only demo across risky `exec`, minimal outbound review points where host-level direct sends stay on the hard-block path, and workspace mutation actions currently limited to `write` / `edit` / `apply_patch`
 
 What this proves:
 
@@ -30,14 +32,14 @@ What this does **not** prove:
 - no GA,
 - no real money movement,
 - no real dangerous execution,
-- no complete outbound or workspace coverage,
+- no host-level approvals, no complete outbound coverage, and no broad workspace coverage,
 - no native Control UI `Security` tab.
 
 Recommended public demo order:
 
 1. Say the scope reminder first
 2. Show the install command
-3. Smoke settings → approvals → audit
+3. Smoke dashboard → checkup → approvals → audit → settings
 4. Run one fake-only `exec` example
 5. Add outbound and workspace examples only if you keep them clearly fake-only
 

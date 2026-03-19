@@ -10,12 +10,13 @@ export function buildSummary(
   primaryMatch: FastPathRuleMatch | undefined,
 ): string {
   const workspaceOperation = buildWorkspaceOperationPresentation(evaluationInput);
+  const destinationPresentation = buildDestinationPresentation(evaluationInput);
 
   if (primaryMatch) {
     return `${primaryMatch.summary}${workspaceOperation ? ` Operation type: ${workspaceOperation}.` : ''} ${evaluationInput.tool_name} call evaluated as ${policyDecision.decision}.`;
   }
 
-  const destination = evaluationInput.destination?.target ? ` to ${evaluationInput.destination.target}` : '';
+  const destination = destinationPresentation ? ` to ${destinationPresentation}` : '';
   const operation = workspaceOperation ? ` with ${workspaceOperation} semantics` : '';
   return `${evaluationInput.tool_name} call${destination}${operation} evaluated as ${policyDecision.decision}.`;
 }
@@ -27,6 +28,7 @@ export function buildExplanation(
   ruleMatches: readonly FastPathRuleMatch[] = [],
 ): string {
   const origin = evaluationInput.origin?.channel ? ` Origin=${evaluationInput.origin.channel}.` : '';
+  const destination = buildDestinationExplanation(evaluationInput);
   const workspaceOperation = buildWorkspaceOperationPresentation(evaluationInput);
   const workspaceOperationExplanation = workspaceOperation
     ? ` Workspace operation type=${workspaceOperation}.`
@@ -39,10 +41,10 @@ export function buildExplanation(
     const additionalMatches =
       additionalRuleIds.length > 0 ? ` Additional fast-path matches: ${additionalRuleIds.join(', ')}.` : '';
 
-    return `${policyDecision.reason} Scope=${primaryMatch.match_scope}.${additionalMatches}${workspaceOperationExplanation}${origin}`;
+    return `${policyDecision.reason} Scope=${primaryMatch.match_scope}.${additionalMatches}${destination}${workspaceOperationExplanation}${origin}`;
   }
 
-  return `${policyDecision.reason}${workspaceOperationExplanation}${origin}`;
+  return `${policyDecision.reason}${destination}${workspaceOperationExplanation}${origin}`;
 }
 
 export function buildApprovalActionTitle(evaluationInput: EvaluationInput): string {
@@ -63,8 +65,9 @@ export function buildApprovalActionTitle(evaluationInput: EvaluationInput): stri
 }
 
 export function buildApprovalImpactScope(evaluationInput: EvaluationInput): string | undefined {
-  if (evaluationInput.destination?.target) {
-    return evaluationInput.destination.target;
+  const destinationPresentation = buildDestinationPresentation(evaluationInput);
+  if (destinationPresentation) {
+    return destinationPresentation;
   }
 
   if (evaluationInput.workspace_context?.paths.length) {
@@ -73,6 +76,49 @@ export function buildApprovalImpactScope(evaluationInput: EvaluationInput): stri
 
   const command = evaluationInput.tool_params.command;
   return typeof command === 'string' ? command.trim() : undefined;
+}
+
+function buildDestinationPresentation(evaluationInput: EvaluationInput): string | undefined {
+  const destination = evaluationInput.destination;
+  if (!destination) {
+    return undefined;
+  }
+
+  const routeParts = [destination.channel, destination.account, destination.conversation].filter(
+    (value): value is string => Boolean(value),
+  );
+  const threadPresentation = destination.thread ? ` (thread ${destination.thread})` : '';
+
+  if (destination.target && routeParts.length > 0) {
+    return `${destination.target} via ${routeParts.join('/')}${threadPresentation}`;
+  }
+
+  if (destination.target) {
+    return `${destination.target}${threadPresentation}`;
+  }
+
+  if (routeParts.length > 0) {
+    return `${routeParts.join('/')}${threadPresentation}`;
+  }
+
+  if (destination.thread) {
+    return `thread ${destination.thread}`;
+  }
+
+  return undefined;
+}
+
+function buildDestinationExplanation(evaluationInput: EvaluationInput): string {
+  const destinationPresentation = buildDestinationPresentation(evaluationInput);
+  const targetMode = evaluationInput.destination?.target_mode;
+  if (!destinationPresentation && !targetMode) {
+    return '';
+  }
+
+  return [
+    destinationPresentation ? ` Outbound route=${destinationPresentation}.` : '',
+    targetMode ? ` Target mode=${targetMode}.` : '',
+  ].join('');
 }
 
 function buildWorkspaceOperationPresentation(

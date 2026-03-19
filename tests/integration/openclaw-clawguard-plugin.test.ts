@@ -12,6 +12,7 @@ import { createAfterToolCallHandler } from '../../plugins/openclaw-clawguard/src
 import { createBeforeToolCallHandler } from '../../plugins/openclaw-clawguard/src/hooks/before-tool.js';
 import { createMessageSentHandler } from '../../plugins/openclaw-clawguard/src/hooks/message-sent.js';
 import { createMessageSendingHandler } from '../../plugins/openclaw-clawguard/src/hooks/message-sending.js';
+import { createToolResultPersistHandler } from '../../plugins/openclaw-clawguard/src/hooks/tool-result-persist.js';
 import { createApprovalsRoute } from '../../plugins/openclaw-clawguard/src/routes/approvals.js';
 import { createAuditRoute } from '../../plugins/openclaw-clawguard/src/routes/audit.js';
 import { createCheckupRoute } from '../../plugins/openclaw-clawguard/src/routes/checkup.js';
@@ -512,8 +513,9 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(readme).toContain('install posture is demo-only and local-only');
     expect(readme).toContain('no registry publish should be implied');
     expect(readme).toContain('outbound coverage is still intentionally minimal');
-    expect(readme).toContain('host-level outbound now keeps hard blocks on `message_sending`');
-    expect(readme).toContain('closes allowed / failed delivery on `message_sent`');
+    expect(readme).toContain('host-level direct outbound cannot enter the pending approval loop');
+    expect(readme).toContain('message_sending` stays on the hard-block path');
+    expect(readme).toContain('message_sent` only closes sends that were actually allowed to leave the host');
   });
 
   it('keeps the install demo package surface and local-path install constraints explicit', () => {
@@ -1154,6 +1156,73 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(getAuditKinds(state)).toEqual(expect.arrayContaining(['allow_once_issued', 'allow_once_consumed']));
   });
 
+  it('closes a workspace replay through tool_result_persist when the host persists the result', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')).toMatchObject({
+      run_id: 'run-workspace-write-1',
+      tool_call_id: 'tool-workspace-write-1',
+      tool_name: 'write',
+    });
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain('Final outcome allowed after execution.');
+  });
+
+  it('keeps exec finalization on after_tool_call even when tool_result_persist fires', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const afterHandler = createAfterToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createRiskyExecEvent('pnpm test');
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')).toBeUndefined();
+
+    afterHandler(
+      {
+        ...event,
+        result: 'command finished',
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')).toMatchObject({
+      run_id: 'run-1',
+      tool_call_id: 'tool-1',
+      tool_name: 'exec',
+    });
+  });
+
   it('cancels direct host outbound sends when message_sending hits a hard block rule', () => {
     const state = createClawGuardState();
     const handler = createMessageSendingHandler(state);
@@ -1181,7 +1250,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(getAuditKinds(state).filter((kind) => kind === 'allowed')).toHaveLength(0);
   });
 
-  it('does not queue approval-only host outbound matches on message_sending', () => {
+  it('hard-blocks approval-only host outbound matches on message_sending', () => {
     const state = createClawGuardState();
     const handler = createMessageSendingHandler(state);
     const { event, context } = createHostOutboundMessageEvent({
@@ -1190,9 +1259,12 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 
     const result = handler(event, context);
 
-    expect(result).toBeUndefined();
+    expect(result).toEqual({ cancel: true });
     expect(state.pendingActions.list()).toHaveLength(0);
     expect(getAuditKinds(state)).not.toContain('pending_action_created');
+    expect(getLatestAuditByKind(state, 'blocked')?.detail).toContain(
+      'Direct host outbound cannot enter the pending approval loop',
+    );
   });
 
   it('does not allow a retry when the fingerprint changes', () => {
@@ -1534,7 +1606,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
           '/plugins/clawguard/settings',
         ],
         limitations:
-          'Host-level outbound keeps hard blocks on message_sending and closes allowed or failed delivery on message_sent, while tool-level approvals stay on message / sessions_send.',
+          'Host-level direct outbound cannot enter the pending approval loop, so message_sending stays on the hard-block path for both approve_required and block cases; message_sent only closes sends that were actually allowed to leave the host, while tool-level approvals stay on message / sessions_send.',
       },
     });
   });
@@ -2594,6 +2666,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
      expect(loaded?.hookNames).toContain('message_sending');
      expect(loaded?.hookNames).toContain('before_tool_call');
      expect(loaded?.hookNames).toContain('after_tool_call');
+     expect(loaded?.hookNames).toContain('tool_result_persist');
 
     const approvalsRoute = registry.httpRoutes.find(
       (entry) => entry.pluginId === 'clawguard' && entry.path === '/plugins/clawguard/approvals',
