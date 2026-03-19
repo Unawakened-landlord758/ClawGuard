@@ -84,6 +84,7 @@ declare module 'openclaw/plugin-sdk/core' {
     readonly content: string;
     readonly success: boolean;
     readonly error?: string;
+    readonly metadata?: Record<string, unknown>;
   }
 
   export type BeforeToolCallHandler = (

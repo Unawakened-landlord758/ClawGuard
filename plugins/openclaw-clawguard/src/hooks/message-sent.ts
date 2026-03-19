@@ -5,6 +5,7 @@ interface MessageSentEventLike {
   readonly content: string;
   readonly success: boolean;
   readonly error?: string;
+  readonly metadata?: Record<string, unknown>;
 }
 
 interface MessageContextLike {
@@ -20,6 +21,7 @@ export function createMessageSentHandler(state: ClawGuardState) {
       content: event.content,
       success: event.success,
       error: event.error,
+      metadata: event.metadata,
       channelId: context.channelId,
       accountId: context.accountId,
       conversationId: context.conversationId,
