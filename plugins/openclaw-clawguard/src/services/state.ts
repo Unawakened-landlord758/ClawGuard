@@ -42,6 +42,13 @@ export interface ToolContextSnapshot {
   readonly sessionKey?: string;
   readonly sessionId?: string;
   readonly agentId?: string;
+  readonly deliveryContext?: {
+    readonly channel?: string;
+    readonly to?: string;
+    readonly accountId?: string;
+    readonly conversationId?: string;
+    readonly threadId?: string | number;
+  };
 }
 
 export interface ToolResultSnapshot extends ToolContextSnapshot {
@@ -550,6 +557,7 @@ function buildGuardedEvaluationArtifacts(
       sessionKey: input.sessionKey,
       sessionId: input.sessionId,
       agentId: input.agentId,
+      deliveryContext: input.deliveryContext,
     },
   });
 

@@ -11,6 +11,13 @@ interface BeforeToolCallContextLike {
   readonly sessionKey?: string;
   readonly sessionId?: string;
   readonly agentId?: string;
+  readonly deliveryContext?: {
+    readonly channel?: string;
+    readonly to?: string;
+    readonly accountId?: string;
+    readonly conversationId?: string;
+    readonly threadId?: string | number;
+  };
 }
 
 interface BeforeToolCallResultLike {
@@ -31,6 +38,7 @@ export function createBeforeToolCallHandler(state: ClawGuardState) {
       sessionKey: context.sessionKey,
       sessionId: context.sessionId,
       agentId: context.agentId,
+      deliveryContext: context.deliveryContext,
     });
 
     if (!result.block) {

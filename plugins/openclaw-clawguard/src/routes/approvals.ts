@@ -9,6 +9,7 @@ import {
   DASHBOARD_ROUTE_PATH,
   INSTALL_DEMO,
   getOperatorAction,
+  readOutboundRouteFromDetail,
   readOutboundRouteMode,
   renderClawGuardNav,
   renderControlSurfaceIntro,
@@ -141,6 +142,14 @@ function describeOutboundRoute(entry: PendingAction): string | undefined {
 
   const route = entry.params.to;
   if (typeof route !== 'string' || route.trim().length === 0) {
+    const candidates = [entry.guidance_summary, entry.impact_scope, entry.reason_summary];
+    for (const candidate of candidates) {
+      const derivedRoute = readOutboundRouteFromDetail(candidate ?? '');
+      if (derivedRoute) {
+        return derivedRoute;
+      }
+    }
+
     return undefined;
   }
 

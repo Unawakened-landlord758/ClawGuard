@@ -2096,6 +2096,123 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(auditHtmlResponse.body).toContain('Route mode=explicit.');
   });
 
+  it('surfaces implicit outbound route mode through approvals and final audit for queued message deliveries', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const afterHandler = createAfterToolCallHandler(state);
+    const approvalsRoute = createApprovalsRoute(state);
+    const auditRoute = createAuditRoute(state);
+
+    const result = beforeHandler(
+      {
+        toolName: 'sessions_send',
+        params: {
+          message: 'daily build finished successfully',
+        },
+        runId: 'run-outbound-implicit-1',
+        toolCallId: 'tool-outbound-implicit-1',
+      },
+      {
+        sessionKey: 'session-outbound-implicit-1',
+        sessionId: 'session-outbound-implicit-id-1',
+        agentId: 'agent-outbound-implicit-1',
+        deliveryContext: {
+          channel: 'slack',
+          to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+          accountId: 'default',
+          conversationId: 'C123',
+          threadId: '1111.2222',
+        },
+      },
+    );
+
+    const pending = state.pendingActions.list()[0];
+    expect(result).toMatchObject({ block: true });
+    expect(pending.action_title).toBe('Approve outbound delivery (implicit route)');
+    expect(result?.blockReason).toContain('Route mode=implicit.');
+
+    const approvalsHtmlResponse = createMockResponse();
+    approvalsRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/approvals',
+      } as never,
+      approvalsHtmlResponse as never,
+    );
+
+    expect(approvalsHtmlResponse.statusCode).toBe(200);
+    expect(approvalsHtmlResponse.body).toContain('Approve outbound delivery (implicit route)');
+    expect(approvalsHtmlResponse.body).toContain('Route mode:</strong> implicit route');
+    expect(approvalsHtmlResponse.body).toContain(
+      'Outbound route:</strong> https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222)',
+    );
+
+    state.approvePendingAction(pending.pending_action_id);
+
+    expect(
+      beforeHandler(
+        {
+          toolName: 'sessions_send',
+          params: {
+            message: 'daily build finished successfully',
+          },
+          runId: 'run-outbound-implicit-1',
+          toolCallId: 'tool-outbound-implicit-1',
+        },
+        {
+          sessionKey: 'session-outbound-implicit-1',
+          sessionId: 'session-outbound-implicit-id-1',
+          agentId: 'agent-outbound-implicit-1',
+          deliveryContext: {
+            channel: 'slack',
+            to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+            accountId: 'default',
+            conversationId: 'C123',
+            threadId: '1111.2222',
+          },
+        },
+      ),
+    ).toBeUndefined();
+
+    afterHandler(
+      {
+        toolName: 'sessions_send',
+        params: {
+          message: 'daily build finished successfully',
+        },
+        runId: 'run-outbound-implicit-1',
+        toolCallId: 'tool-outbound-implicit-1',
+        result: 'message delivered',
+      },
+      {
+        sessionKey: 'session-outbound-implicit-1',
+        sessionId: 'session-outbound-implicit-id-1',
+        agentId: 'agent-outbound-implicit-1',
+      } as never,
+    );
+
+    const auditHtmlResponse = createMockResponse();
+    auditRoute(
+      {
+        method: 'GET',
+        url: '/plugins/clawguard/audit',
+      } as never,
+      auditHtmlResponse as never,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222).',
+    );
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain('Route mode=implicit.');
+    expect(auditHtmlResponse.statusCode).toBe(200);
+    expect(auditHtmlResponse.body).toContain(
+      'Latest outbound route mode in recent replay:</strong> implicit <small>(parsed from the latest replay detail, not the live queue)</small>',
+    );
+    expect(auditHtmlResponse.body).toContain(
+      'Latest outbound route in recent replay:</strong> https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222)',
+    );
+  });
+
   it('surfaces workspace result state, outbound route mode, and outbound route as a quick scan on dashboard and checkup', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);

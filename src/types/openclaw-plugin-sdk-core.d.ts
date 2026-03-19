@@ -20,10 +20,19 @@ declare module 'openclaw/plugin-sdk/core' {
     readonly toolCallId?: string;
   }
 
+  export interface DeliveryContext {
+    readonly channel?: string;
+    readonly to?: string;
+    readonly accountId?: string;
+    readonly conversationId?: string;
+    readonly threadId?: string | number;
+  }
+
   export interface BeforeToolCallContext {
     readonly sessionKey?: string;
     readonly sessionId?: string;
     readonly agentId?: string;
+    readonly deliveryContext?: DeliveryContext;
   }
 
   export interface BeforeToolCallResult {
