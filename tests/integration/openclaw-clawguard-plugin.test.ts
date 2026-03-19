@@ -1251,6 +1251,70 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('promotes top-level workspace result path pairs into rename-like closure summaries', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\templates\\ci-template.yml',
+      content: 'name: CI\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          fromPath: 'src\\templates\\ci-template.yml',
+          toPath: '.github\\workflows\\ci-template.yml',
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=rename-like via renamed; renamed=src\\templates\\ci-template.yml -> .github\\workflows\\ci-template.yml',
+    );
+  });
+
+  it('keeps incomplete or conflicting top-level workspace path pairs on the existing closure logic', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\templates\\ci-template.yml',
+      content: 'name: CI\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          fromPath: 'src\\templates\\ci-template.yml',
+          toPath: '.github\\workflows\\ci-template.yml',
+          oldPath: 'src\\templates\\legacy-template.yml',
+          newPath: '.github\\workflows\\release-template.yml',
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed',
+    );
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).not.toContain(
+      'workspace result state=rename-like via renamed',
+    );
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).not.toContain('renamed=');
+  });
+
   it('summarizes arrays of workspace path pairs in the final audit trail', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);

@@ -702,7 +702,7 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
   const created = summarizeStructuredResultField(record, 'created');
   const updated = summarizeStructuredResultField(record, 'updated');
   const deleted = summarizeStructuredResultField(record, 'deleted');
-  const renamed = summarizeStructuredResultField(record, 'renamed');
+  const renamed = summarizeStructuredResultField(record, 'renamed') ?? summarizeTopLevelStructuredResultRename(record);
   const workspaceResultState = summarizeWorkspaceResultState(
     operationType,
     created,
@@ -1048,6 +1048,44 @@ function summarizeStructuredResultField(
 function summarizeStructuredResultFieldValue(value: unknown): string | undefined {
   const normalizedValues = summarizeStructuredResultValues(value);
   return normalizedValues.length > 0 ? normalizedValues.join(', ') : undefined;
+}
+
+function summarizeTopLevelStructuredResultRename(record: Record<string, unknown>): string | undefined {
+  const primaryPair = readStructuredResultTopLevelPathPair(record, 'fromPath', 'toPath');
+  const secondaryPair = readStructuredResultTopLevelPathPair(record, 'oldPath', 'newPath');
+
+  if (primaryPair && secondaryPair) {
+    return primaryPair === secondaryPair ? `renamed=${primaryPair}` : undefined;
+  }
+
+  if (primaryPair) {
+    return `renamed=${primaryPair}`;
+  }
+
+  if (secondaryPair) {
+    return `renamed=${secondaryPair}`;
+  }
+
+  return undefined;
+}
+
+function readStructuredResultTopLevelPathPair(
+  record: Record<string, unknown>,
+  fromKey: 'fromPath' | 'oldPath',
+  toKey: 'toPath' | 'newPath',
+): string | undefined {
+  const fromPath = readOptionalString(record[fromKey]);
+  const toPath = readOptionalString(record[toKey]);
+
+  if (!fromPath && !toPath) {
+    return undefined;
+  }
+
+  if (!fromPath || !toPath) {
+    return undefined;
+  }
+
+  return fromPath.trim().toLowerCase() === toPath.trim().toLowerCase() ? undefined : `${fromPath} -> ${toPath}`;
 }
 
 function summarizeStructuredResultValues(value: unknown): string[] {
