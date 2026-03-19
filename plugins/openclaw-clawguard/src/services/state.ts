@@ -581,7 +581,9 @@ function buildImpactScope(artifacts: EvaluationArtifacts): string | undefined {
   return (
     artifacts.approval_request?.impact_scope ??
     artifacts.evaluation_input.destination?.target ??
-    artifacts.evaluation_input.workspace_context?.paths[0] ??
+    (artifacts.evaluation_input.workspace_context?.paths.length
+      ? artifacts.evaluation_input.workspace_context.paths.join(', ')
+      : undefined) ??
     readCommand(artifacts.evaluation_input.tool_params)
   );
 }

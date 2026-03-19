@@ -184,6 +184,9 @@ describe('OpenClaw adapter pipeline', () => {
         'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222)',
     });
     expect(result.risk_event.summary).toContain('Detected a public webhook destination.');
+    expect(result.risk_event.summary).toContain(
+      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222).',
+    );
     expect(result.risk_event.summary).toContain('Route mode=explicit.');
     expect(result.risk_event.explanation).toContain(
       'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222).',

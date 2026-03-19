@@ -14,7 +14,7 @@ export function buildSummary(
   const routeMode = buildRouteModePresentation(evaluationInput);
 
   if (primaryMatch) {
-    return `${primaryMatch.summary}${workspaceOperation ? ` Operation type: ${workspaceOperation}.` : ''}${routeMode ? ` Route mode=${routeMode}.` : ''} ${evaluationInput.tool_name} call evaluated as ${policyDecision.decision}.`;
+    return `${primaryMatch.summary}${destinationPresentation ? ` Outbound route=${destinationPresentation}.` : ''}${workspaceOperation ? ` Operation type: ${workspaceOperation}.` : ''}${routeMode ? ` Route mode=${routeMode}.` : ''} ${evaluationInput.tool_name} call evaluated as ${policyDecision.decision}.`;
   }
 
   const destination = destinationPresentation ? ` to ${destinationPresentation}` : '';

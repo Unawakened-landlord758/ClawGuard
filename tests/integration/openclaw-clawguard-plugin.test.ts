@@ -1082,6 +1082,23 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(getAuditKinds(state)).toEqual(expect.arrayContaining(['risk_hit', 'blocked']));
   });
 
+  it('keeps the full workspace path list in immediate block impact scope fallback', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      fromPath: 'C:\\Windows\\System32\\drivers\\etc\\hosts',
+      toPath: 'C:\\Windows\\System32\\drivers\\etc\\hosts.bak',
+      content: '127.0.0.1 example.test',
+    });
+
+    const result = beforeHandler(event, context);
+
+    expect(result).toMatchObject({ block: true });
+    expect(result?.blockReason).toContain(
+      'Impact scope: C:\\Windows\\System32\\drivers\\etc\\hosts, C:\\Windows\\System32\\drivers\\etc\\hosts.bak',
+    );
+  });
+
   it('closes the audit loop with an allowed outcome after a safe workspace write completes', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
