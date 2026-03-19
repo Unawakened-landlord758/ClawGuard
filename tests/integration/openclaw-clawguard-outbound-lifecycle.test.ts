@@ -165,6 +165,30 @@ describe('OpenClaw ClawGuard outbound lifecycle', () => {
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain('Route mode=explicit.');
   });
 
+  it('preserves host outbound thread context from message_sending when message_sent omits metadata', () => {
+    const state = createClawGuardState();
+    const sendingHandler = createMessageSendingHandler(state);
+    const sentHandler = createMessageSentHandler(state);
+    const { event, context } = createHostOutboundMessageEvent({
+      content: 'daily build finished successfully',
+      metadata: { threadTs: '1111.2222' },
+    });
+
+    expect(sendingHandler(event, context)).toBeUndefined();
+    sentHandler(
+      {
+        to: event.to,
+        content: event.content,
+        success: true,
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Outbound route=C123 via slack/default/C123 (thread 1111.2222).',
+    );
+  });
+
   it('hard-blocks direct host outbound when the content would otherwise require approval', () => {
     const state = createClawGuardState();
     const sendingHandler = createMessageSendingHandler(state);

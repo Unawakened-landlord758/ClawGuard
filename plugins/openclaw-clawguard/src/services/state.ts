@@ -56,6 +56,11 @@ interface TrackedToolExecution {
   readonly artifacts: EvaluationArtifacts | ApprovalIntegratedArtifacts;
 }
 
+interface TrackedHostOutboundExecution {
+  readonly tracking_key: string;
+  readonly snapshot: MessageSendingSnapshot;
+}
+
 const defaultClock: Clock = {
   now: () => new Date(),
 };
@@ -75,6 +80,7 @@ export class ClawGuardState {
   private readonly repository: StateRepository;
 
   private readonly trackedExecutions = new Map<string, TrackedToolExecution>();
+  private readonly trackedHostOutboundExecutions = new Map<string, TrackedHostOutboundExecution>();
 
   public constructor(
     public readonly config: ClawGuardPluginConfig,
@@ -245,6 +251,7 @@ export class ClawGuardState {
   public evaluateMessageSending(input: MessageSendingSnapshot): MessageSendingDecision {
     const toolName = normalizeToolName('message_sending');
     const params = buildHostOutboundToolParams(input);
+    const trackingKey = buildHostOutboundTrackingKey(input);
     const actionFingerprint = fingerprintAction({
       toolName,
       params,
@@ -252,8 +259,14 @@ export class ClawGuardState {
     const artifacts = buildHostOutboundEvaluationArtifacts(input, params);
 
     if (!shouldHardBlockHostOutbound(artifacts.policy_decision.decision)) {
+      this.trackedHostOutboundExecutions.set(trackingKey, {
+        tracking_key: trackingKey,
+        snapshot: input,
+      });
       return { cancel: false };
     }
+
+    this.trackedHostOutboundExecutions.delete(trackingKey);
 
     this.audit.record({
       kind: 'risk_hit',
@@ -279,19 +292,23 @@ export class ClawGuardState {
 
   public finalizeMessageSent(input: MessageSentSnapshot): void {
     const toolName = normalizeToolName('message_sending');
-    const params = buildHostOutboundToolParams(input);
+    const trackingKey = buildHostOutboundTrackingKey(input);
+    const trackedHostOutbound = this.trackedHostOutboundExecutions.get(trackingKey);
+    const resolvedInput = mergeTrackedHostOutboundSnapshot(input, trackedHostOutbound?.snapshot);
+    const params = buildHostOutboundToolParams(resolvedInput);
     const actionFingerprint = fingerprintAction({
       toolName,
       params,
     });
-    const artifacts = buildHostOutboundEvaluationArtifacts(input, params);
+    this.trackedHostOutboundExecutions.delete(trackingKey);
+    const artifacts = buildHostOutboundEvaluationArtifacts(resolvedInput, params);
     if (shouldHardBlockHostOutbound(artifacts.policy_decision.decision)) {
       return;
     }
     const integrated = applyPostExecutionResultToEvaluationArtifacts(artifacts, {
       tool_status: input.success ? ToolStatus.Completed : ToolStatus.Failed,
       timestamp: toIsoString(this.clock.now()),
-      summary: buildHostOutboundSummary(input),
+      summary: buildHostOutboundSummary(resolvedInput),
     });
     const finalKind = mapFinalStatusToAuditKind(integrated.audit_record.final_status);
     if (!finalKind) {
@@ -1017,6 +1034,34 @@ function buildHostOutboundActionId(
     },
   });
   return `${prefix}_${stableId.slice(0, 16)}`;
+}
+
+function buildHostOutboundTrackingKey(input: Pick<MessageSendingSnapshot, 'to' | 'content' | 'channelId' | 'accountId' | 'conversationId'>): string {
+  return fingerprintAction({
+    toolName: 'message_sending:tracking',
+    params: {
+      to: input.to,
+      content: input.content,
+      channelId: input.channelId,
+      accountId: input.accountId,
+      conversationId: input.conversationId,
+    },
+  });
+}
+
+function mergeTrackedHostOutboundSnapshot(
+  input: MessageSentSnapshot,
+  trackedSnapshot: MessageSendingSnapshot | undefined,
+): MessageSentSnapshot {
+  if (!trackedSnapshot) {
+    return input;
+  }
+
+  return {
+    ...trackedSnapshot,
+    ...input,
+    metadata: input.metadata ?? trackedSnapshot.metadata,
+  };
 }
 
 function readHostOutboundThread(metadata: Record<string, unknown> | undefined): string | undefined {
