@@ -1589,6 +1589,13 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
     expect(approvalsHtmlResponse.body).toContain('Route mode:</strong> explicit route');
     expect(auditHtmlResponse.statusCode).toBe(200);
+    expect(auditHtmlResponse.body).toContain('Latest outbound route in recent replay:');
+    expect(auditHtmlResponse.body).toContain(
+      'Latest outbound route in recent replay:</strong> https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
+    );
+    expect(auditHtmlResponse.body).toContain(
+      'parsed from the latest replay detail, not the live queue',
+    );
     expect(auditHtmlResponse.body).toContain('pending_action_created');
     expect(auditHtmlResponse.body).toContain('Route mode:</strong> explicit route');
     expect(auditHtmlResponse.body).toContain('Route mode=explicit.');

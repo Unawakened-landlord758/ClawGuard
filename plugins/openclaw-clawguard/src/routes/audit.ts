@@ -429,6 +429,16 @@ function summarizeFlowOutboundRoute(entries: AuditEntry[]): string | undefined {
   return undefined;
 }
 
+function findLatestOutboundRoute(flows: TimelineFlow[]): string | undefined {
+  for (const flow of flows) {
+    if (flow.outboundRoute) {
+      return flow.outboundRoute;
+    }
+  }
+
+  return undefined;
+}
+
 function summarizeFlowSystemAction(entries: AuditEntry[]): string {
   if (entries.some((entry) => entry.kind === 'allow_once_consumed')) {
     return 'Spent the one approved retry and let the matching action continue.';
@@ -632,6 +642,7 @@ function formatTimestamp(value: string): string {
 }
 
 function renderAuditPage(payload: AuditTimelinePayload): string {
+  const latestOutboundRoute = findLatestOutboundRoute(payload.timeline.flows);
   const flowCards = payload.timeline.flows
     .map(
       (flow) => `
@@ -763,6 +774,7 @@ function renderAuditPage(payload: AuditTimelinePayload): string {
     <section class="hero">
       <p>Replay the fake-only audit entries ClawGuard already captured. Dashboard is the status view, Checkup is the explanation view, Approvals is the action view, and Audit reconstructs what actually happened over time.</p>
       <p>${renderAuditLiveQueueHintCopy()}</p>
+      ${latestOutboundRoute ? `<p><strong>Latest outbound route in recent replay:</strong> ${escapeHtml(latestOutboundRoute)} <small>(parsed from the latest replay detail, not the live queue)</small></p>` : ''}
       <p><strong>Current posture:</strong> ${escapeHtml(INSTALL_DEMO.demoPosture)}</p>
       <p><strong>Navigation posture:</strong> ${escapeHtml(INSTALL_DEMO.navigationPosture)}</p>
     </section>
