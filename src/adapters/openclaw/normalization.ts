@@ -182,7 +182,7 @@ function normalizeDestination(
   const thread = explicitThread ?? fallbackDeliveryContext?.threadId;
   const channel = explicitChannel ?? fallbackDeliveryContext?.channel;
   const account = explicitAccount ?? fallbackDeliveryContext?.accountId;
-  const conversation = explicitConversation;
+  const conversation = explicitConversation ?? fallbackDeliveryContext?.conversationId;
   const targetMode = explicitTarget ? 'explicit' : fallbackDeliveryContext?.to ? 'implicit' : undefined;
 
   if (!target && !thread && !channel && !account && !conversation) {
@@ -206,6 +206,7 @@ function normalizeSessionDeliveryContext(
   readonly channel?: string;
   readonly to?: string;
   readonly accountId?: string;
+  readonly conversationId?: string;
   readonly threadId?: string;
 } | undefined {
   if (!sessionPolicy.deliveryContext) {
@@ -215,12 +216,13 @@ function normalizeSessionDeliveryContext(
   const channel = normalizeOptionalString(sessionPolicy.deliveryContext.channel);
   const to = normalizeOptionalString(sessionPolicy.deliveryContext.to);
   const accountId = normalizeOptionalString(sessionPolicy.deliveryContext.accountId);
+  const conversationId = normalizeOptionalString(sessionPolicy.deliveryContext.conversationId);
   const threadId =
     sessionPolicy.deliveryContext.threadId !== undefined
       ? normalizeOptionalString(String(sessionPolicy.deliveryContext.threadId))
       : undefined;
 
-  if (!channel && !to && !accountId && !threadId) {
+  if (!channel && !to && !accountId && !conversationId && !threadId) {
     return undefined;
   }
 
@@ -228,6 +230,7 @@ function normalizeSessionDeliveryContext(
     ...(channel ? { channel } : {}),
     ...(to ? { to } : {}),
     ...(accountId ? { accountId } : {}),
+    ...(conversationId ? { conversationId } : {}),
     ...(threadId ? { threadId } : {}),
   };
 }

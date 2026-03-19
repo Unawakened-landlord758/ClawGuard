@@ -90,6 +90,7 @@ describe('Sprint 0 input normalization', () => {
           channel: 'slack',
           to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
           accountId: 'default',
+          conversationId: 'C123',
           threadId: '1111.2222',
         },
       },
@@ -101,6 +102,7 @@ describe('Sprint 0 input normalization', () => {
       thread: '1111.2222',
       channel: 'slack',
       account: 'default',
+      conversation: 'C123',
       target_mode: 'implicit',
     });
   });

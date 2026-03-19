@@ -8,6 +8,7 @@ export interface OpenClawDeliveryContextInput {
   readonly channel?: string;
   readonly to?: string;
   readonly accountId?: string;
+  readonly conversationId?: string;
   readonly threadId?: string | number;
 }
 

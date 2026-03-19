@@ -960,6 +960,7 @@ describe('OpenClaw adapter pipeline', () => {
           channel: 'slack',
           to: 'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token',
           accountId: 'default',
+          conversationId: 'C123',
           threadId: '1111.2222',
         },
       },
@@ -971,6 +972,7 @@ describe('OpenClaw adapter pipeline', () => {
       thread: '1111.2222',
       channel: 'slack',
       account: 'default',
+      conversation: 'C123',
       target_mode: 'implicit',
     });
     expect(result.rule_matches.map((match) => match.rule_id)).toContain('destination.public-webhook-url');
@@ -978,11 +980,14 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.approval_request).toMatchObject({
       action_title: 'Approve outbound delivery (implicit route)',
       impact_scope:
-        'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default (thread 1111.2222)',
+        'https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222)',
     });
+    expect(result.risk_event.summary).toContain(
+      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222).',
+    );
     expect(result.risk_event.summary).toContain('Route mode=implicit.');
     expect(result.risk_event.explanation).toContain(
-      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default (thread 1111.2222).',
+      'Outbound route=https://hooks.slack.com/services/T00000000/B00000000/very-secret-token via slack/default/C123 (thread 1111.2222).',
     );
     expect(result.risk_event.explanation).toContain('Route mode=implicit.');
   });
