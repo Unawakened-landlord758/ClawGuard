@@ -13,9 +13,11 @@ import {
   renderClawGuardNav,
   renderControlSurfaceIntro,
   renderCoverageMatrix,
+  renderControlSurfaceDomainBreakdown,
   renderInstallDemoPostureNote,
   renderLifecycleHandoffCopy,
   renderOperatorActionLink,
+  summarizeControlSurfaceDomains,
   INSTALL_DEMO,
 } from './shared.js';
 
@@ -114,6 +116,10 @@ export function createDashboardPayload(state: ClawGuardState) {
   const recentAuditItems = recentAudit.slice(0, RECENT_AUDIT_LIMIT);
   const recentRiskSignals = countAuditKinds(recentAuditItems, RECENT_RISK_SIGNAL_KINDS);
   const recentErrors = countAuditKinds(recentAuditItems, RECENT_ERROR_KINDS);
+  const controlSurfaceDomainBreakdown = {
+    approvals: summarizeControlSurfaceDomains(pendingActions),
+    recentAudit: summarizeControlSurfaceDomains(recentAuditItems),
+  } as const;
   const firstPending = approvalsNeedingDecision[0];
   const quickActions = [
     createOperatorQuickAction('review-approvals', {
@@ -362,6 +368,9 @@ export function createDashboardPayload(state: ClawGuardState) {
     },
     topRisks,
     quickActions,
+    controlSurface: {
+      domainBreakdown: controlSurfaceDomainBreakdown,
+    },
     nextSteps: quickActions.map(
       (action) => `${action.title}: ${action.description} (${action.href})`,
     ),
@@ -420,6 +429,14 @@ function renderDashboardPage(state: ClawGuardState): string {
       <p>Current limitation: ${INSTALL_DEMO.limitations}</p>
       <h3>Current bounded coverage</h3>
       ${renderCoverageMatrix()}
+    </section>
+    <section>
+      <h2>Live posture by domain</h2>
+      <p>This keeps the active lane mix visible without changing the underlying hooks or state model.</p>
+      <h3>Approvals queue</h3>
+      ${renderControlSurfaceDomainBreakdown(payload.controlSurface.domainBreakdown.approvals)}
+      <h3>Recent audit trail</h3>
+      ${renderControlSurfaceDomainBreakdown(payload.controlSurface.domainBreakdown.recentAudit)}
     </section>
     <section>
       <h2>Top attention items right now</h2>

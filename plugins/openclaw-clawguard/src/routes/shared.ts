@@ -57,6 +57,15 @@ type CoverageLane = {
   readonly summary: string;
 };
 
+export type ControlSurfaceDomain = 'exec' | 'outbound' | 'workspace' | 'other';
+
+export interface ControlSurfaceDomainBreakdown {
+  readonly exec: number;
+  readonly outbound: number;
+  readonly workspace: number;
+  readonly other: number;
+}
+
 export type ControlSurfaceHandoffMode = 'dashboard' | 'checkup';
 
 export const INSTALL_DEMO = {
@@ -261,6 +270,34 @@ export function renderCoverageMatrix(): string {
   return `<ul>${items}</ul>`;
 }
 
+export function summarizeControlSurfaceDomains(
+  entries: ReadonlyArray<{ readonly tool_name?: string }>,
+): ControlSurfaceDomainBreakdown {
+  const summary = {
+    exec: 0,
+    outbound: 0,
+    workspace: 0,
+    other: 0,
+  };
+
+  for (const entry of entries) {
+    summary[classifyControlSurfaceDomain(entry.tool_name)] += 1;
+  }
+
+  return summary;
+}
+
+export function renderControlSurfaceDomainBreakdown(
+  counts: ControlSurfaceDomainBreakdown,
+): string {
+  return `<ul>
+  <li><strong>Exec</strong>: ${counts.exec}</li>
+  <li><strong>Outbound</strong>: ${counts.outbound}</li>
+  <li><strong>Workspace</strong>: ${counts.workspace}</li>
+  <li><strong>Other</strong>: ${counts.other}</li>
+</ul>`;
+}
+
 export function renderApprovalsQueueBoundaryCopy(): string {
   return APPROVALS_QUEUE_BOUNDARY_COPY;
 }
@@ -334,4 +371,23 @@ export function renderOperatorActionLink(
   label: string,
 ): string {
   return `<a href="${escapeHtml(action.href)}" target="${escapeHtml(action.target)}">${escapeHtml(label)}</a>`;
+}
+
+function classifyControlSurfaceDomain(toolName: string | undefined): ControlSurfaceDomain {
+  const normalized = toolName?.trim().toLowerCase();
+
+  switch (normalized) {
+    case 'exec':
+      return 'exec';
+    case 'message':
+    case 'sessions_send':
+    case 'message_sending':
+      return 'outbound';
+    case 'write':
+    case 'edit':
+    case 'apply_patch':
+      return 'workspace';
+    default:
+      return 'other';
+  }
 }

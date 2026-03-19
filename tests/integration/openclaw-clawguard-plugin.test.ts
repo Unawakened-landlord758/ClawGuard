@@ -1196,7 +1196,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     });
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain('Final outcome allowed after execution.');
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
-      'Result detail: tool result status=completed; created=src\\generated\\feature-flags.ts',
+      'Result detail: tool result status=completed; workspace result state=insert; created=src\\generated\\feature-flags.ts',
     );
   });
 
@@ -1879,6 +1879,12 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(dashboardHtmlResponse.body).toContain('host-level message_sending stays on the hard-block path');
     expect(dashboardHtmlResponse.body).toContain('Workspace</strong> (<code>workspace</code>)');
     expect(dashboardHtmlResponse.body).toContain('tool_result_persist fallback for result closure');
+    expect(dashboardHtmlResponse.body).toContain('Live posture by domain');
+    expect(dashboardHtmlResponse.body).toContain('Approvals queue');
+    expect(dashboardHtmlResponse.body).toContain('Recent audit trail');
+    expect(dashboardHtmlResponse.body).toContain('Exec</strong>: 1');
+    expect(dashboardHtmlResponse.body).toContain('Outbound</strong>: 0');
+    expect(dashboardHtmlResponse.body).toContain('Workspace</strong>: 0');
     expect(dashboardHtmlResponse.body).toContain('Quick actions');
     expect(dashboardHtmlResponse.body).toContain('id="action-review-approvals"');
     expect(dashboardHtmlResponse.body).toContain('id="action-review-demo-posture"');
@@ -1942,6 +1948,12 @@ describe('OpenClaw ClawGuard plugin spike', () => {
       score: { passed: number; total: number };
       checks: unknown[];
     };
+    type DomainBreakdown = {
+      exec: number;
+      outbound: number;
+      workspace: number;
+      other: number;
+    };
     type DashboardMainDrag = {
       itemId: string;
       status: string;
@@ -1969,6 +1981,12 @@ describe('OpenClaw ClawGuard plugin spike', () => {
         items: DashboardCheckupItem[];
         mainDrag: DashboardMainDrag;
         firstFix: DashboardFirstFix;
+      };
+      controlSurface: {
+        domainBreakdown: {
+          approvals: DomainBreakdown;
+          recentAudit: DomainBreakdown;
+        };
       };
       quickActions: DashboardQuickAction[];
       nextSteps: string[];
@@ -2209,6 +2227,20 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     });
     expect(dashboardPayload.checkup.items).toHaveLength(4);
     expect(dashboardPayload.safetyStatus.checks).toHaveLength(dashboardPayload.checkup.items.length);
+    expect(dashboardPayload.controlSurface.domainBreakdown).toEqual({
+      approvals: {
+        exec: 1,
+        outbound: 0,
+        workspace: 0,
+        other: 0,
+      },
+      recentAudit: expect.objectContaining({
+        exec: expect.any(Number),
+        outbound: 0,
+        workspace: 0,
+        other: 0,
+      }),
+    });
     for (const action of dashboardPayload.quickActions) {
       expect(settingsPayload.installDemo.smokePaths).toContain(action.href);
     }
@@ -2272,6 +2304,13 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(checkupHtmlResponse.body).toContain(
       'This is the fixed install-demo legend for the current product surface.',
     );
+    expect(checkupHtmlResponse.body).toContain('Live posture by domain');
+    expect(checkupHtmlResponse.body).toContain(
+      'This is the live split of the same posture signals used to produce the current dashboard summary.',
+    );
+    expect(checkupHtmlResponse.body).toContain('Exec</strong>: 1');
+    expect(checkupHtmlResponse.body).toContain('Outbound</strong>: 0');
+    expect(checkupHtmlResponse.body).toContain('Workspace</strong>: 0');
     expect(checkupHtmlResponse.body).toContain('Main drag and fix first');
     expect(checkupHtmlResponse.body).toContain('All checkup items');
     expect(checkupHtmlResponse.body).toContain('Evidence available right now');
@@ -2324,6 +2363,7 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     const checkupPayload = JSON.parse(checkupJsonResponse.body) as DashboardRoutePayload;
     expect(checkupPayload.safetyStatus).toEqual(dashboardPayload.safetyStatus);
     expect(checkupPayload.checkup).toEqual(dashboardPayload.checkup);
+    expect(checkupPayload.controlSurface).toEqual(dashboardPayload.controlSurface);
     expect(checkupPayload.quickActions).toEqual(dashboardPayload.quickActions);
     expect(checkupPayload.nextSteps).toEqual(dashboardPayload.nextSteps);
 
