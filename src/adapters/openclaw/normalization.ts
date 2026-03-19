@@ -273,6 +273,19 @@ function resolveWorkspaceMutationOperationType(
   }
 
   if (patchText) {
+    const gitRenameHeaderOperationType =
+      detectApplyPatchGitRenameHeaderOperationType(patchText);
+    if (gitRenameHeaderOperationType) {
+      return gitRenameHeaderOperationType;
+    }
+
+    if (hasGitStyleRenameHeaderPair(patchText)) {
+      return (
+        detectApplyPatchSectionOperationType(patchText) ??
+        WorkspaceMutationOperationType.Modify
+      );
+    }
+
     return (
       detectApplyPatchMoveLikeOperationType(patchText) ??
       (baseOperationType === WorkspaceMutationOperationType.Modify
@@ -339,6 +352,107 @@ function detectApplyPatchMoveLikeOperationType(
   return isHighConfidenceApplyPatchRenameLikeMove(deletePaths[0], addPaths[0])
     ? WorkspaceMutationOperationType.RenameLike
     : undefined;
+}
+
+function detectApplyPatchGitRenameHeaderOperationType(
+  patchText: string,
+): WorkspaceMutationOperationType | undefined {
+  const renameFromPaths: string[] = [];
+  const renameToPaths: string[] = [];
+  let sawDisqualifyingSignal = false;
+
+  for (const rawLine of patchText.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (
+      /^diff --git\s+.+$/u.test(line) ||
+      /^similarity index\s+\d+%$/u.test(line) ||
+      /^index\s+.+$/u.test(line)
+    ) {
+      continue;
+    }
+
+    const renameFromMatch = line.match(/^rename from\s+(.+)$/u);
+    if (renameFromMatch) {
+      const path = normalizePatchPath(renameFromMatch[1]);
+      if (path) {
+        renameFromPaths.push(path);
+      } else {
+        sawDisqualifyingSignal = true;
+      }
+      continue;
+    }
+
+    const renameToMatch = line.match(/^rename to\s+(.+)$/u);
+    if (renameToMatch) {
+      const path = normalizePatchPath(renameToMatch[1]);
+      if (path) {
+        renameToPaths.push(path);
+      } else {
+        sawDisqualifyingSignal = true;
+      }
+      continue;
+    }
+
+    if (
+      /^\*\*\* Begin Patch$/u.test(line) ||
+      /^\*\*\* End Patch$/u.test(line) ||
+      /^\*\*\* (?:Add|Delete|Update) File:\s+.+$/u.test(line) ||
+      /^\*\*\* Move to:\s+.+$/u.test(line) ||
+      /^@@(?:\s|$)/u.test(line) ||
+      /^(?:---|\+\+\+)\s+.+$/u.test(line) ||
+      /^new file mode(?:\s+\d+)?$/u.test(line) ||
+      /^deleted file mode(?:\s+\d+)?$/u.test(line) ||
+      /^old mode\s+\d+$/u.test(line) ||
+      /^new mode\s+\d+$/u.test(line) ||
+      /^copy (?:from|to)\s+.+$/u.test(line) ||
+      /^\+(?!\+\+)/u.test(line) ||
+      /^-(?!---)/u.test(line)
+    ) {
+      sawDisqualifyingSignal = true;
+      continue;
+    }
+
+    sawDisqualifyingSignal = true;
+  }
+
+  if (sawDisqualifyingSignal) {
+    return undefined;
+  }
+
+  if (renameFromPaths.length !== 1 || renameToPaths.length !== 1) {
+    return undefined;
+  }
+
+  return isHighConfidenceApplyPatchRenameLikeMove(renameFromPaths[0], renameToPaths[0])
+    ? WorkspaceMutationOperationType.RenameLike
+    : undefined;
+}
+
+function hasGitStyleRenameHeaderPair(patchText: string): boolean {
+  let sawRenameFrom = false;
+  let sawRenameTo = false;
+
+  for (const rawLine of patchText.split(/\r?\n/u)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+
+    if (/^rename from\s+.+$/u.test(line)) {
+      sawRenameFrom = true;
+      continue;
+    }
+
+    if (/^rename to\s+.+$/u.test(line)) {
+      sawRenameTo = true;
+    }
+  }
+
+  return sawRenameFrom && sawRenameTo;
 }
 
 function isHighConfidenceApplyPatchRenameLikeMove(fromPath: string, toPath: string): boolean {

@@ -494,7 +494,7 @@ describe('Sprint 0 input normalization', () => {
     {
       label: 'git rename header',
       patch:
-        'diff --git a/src\\legacy.ts b/src\\clawguard.ts\nsimilarity index 100%\nrename from src\\legacy.ts\nrename to src\\clawguard.ts\n',
+        'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n',
       expectedOperationType: 'rename-like',
     },
     {
@@ -513,6 +513,22 @@ describe('Sprint 0 input normalization', () => {
     const normalized = normalizeOpenClawInputs(buildApplyPatchArgs({ patch }));
 
     expect(normalized.evaluation_input.workspace_context?.operation_type).toBe(expectedOperationType);
+  });
+
+  it('falls back to modify for git rename headers that also include update hunks', () => {
+    const normalized = normalizeOpenClawInputs(
+      buildApplyPatchArgs({
+        patch:
+          'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n--- a/src\\templates\\ci-template.yml\n+++ b/.github\\workflows\\ci-template.yml\n@@ -1 +1 @@\n-name: Old CI\n+name: New CI\n',
+      }),
+    );
+
+    expect(normalized.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\ci-template.yml', '.github\\workflows\\ci-template.yml'],
+      summary:
+        'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n--- a/src\\templates\\ci-template.yml\n+++ b/.github\\workflows\\ci-template.yml\n@@ -1 +1 @@\n-name: Old CI\n+name: New CI',
+      operation_type: 'modify',
+    });
   });
 
   it('merges structured paths with patch-extracted paths without duplicates', () => {

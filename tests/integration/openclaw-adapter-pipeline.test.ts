@@ -444,6 +444,74 @@ describe('OpenClaw adapter pipeline', () => {
     expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
   });
 
+  it('surfaces clean git rename headers as rename-like workspace semantics in approval and audit artifacts', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'apply_patch',
+          params: {
+            patch:
+              'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n',
+          },
+          runId: 'run-patch-git-rename-1',
+          toolCallId: 'tool-patch-git-rename-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-patch-git-rename',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\ci-template.yml', '.github\\workflows\\ci-template.yml'],
+      summary:
+        'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml',
+      operation_type: 'rename-like',
+    });
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (rename-like)',
+      impact_scope: 'src\\templates\\ci-template.yml, .github\\workflows\\ci-template.yml',
+    });
+    expect(result.risk_event.summary).toContain('rename-like');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=rename-like.');
+  });
+
+  it('falls back to modify when git rename headers also include update hunks', () => {
+    const result = buildOpenClawEvaluationArtifacts({
+      clock: fixedClock,
+      before_tool_call: {
+        event: {
+          toolName: 'apply_patch',
+          params: {
+            patch:
+              'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n--- a/src\\templates\\ci-template.yml\n+++ b/.github\\workflows\\ci-template.yml\n@@ -1 +1 @@\n-name: Old CI\n+name: New CI\n',
+          },
+          runId: 'run-patch-git-rename-hunk-1',
+          toolCallId: 'tool-patch-git-rename-hunk-1',
+        },
+      },
+      session_policy: {
+        sessionKey: 'session-patch-git-rename-hunk',
+      },
+    });
+
+    expect(result.evaluation_input.workspace_context).toEqual({
+      paths: ['src\\templates\\ci-template.yml', '.github\\workflows\\ci-template.yml'],
+      summary:
+        'diff --git a/src\\templates\\ci-template.yml b/.github\\workflows\\ci-template.yml\nsimilarity index 100%\nrename from src\\templates\\ci-template.yml\nrename to .github\\workflows\\ci-template.yml\n--- a/src\\templates\\ci-template.yml\n+++ b/.github\\workflows\\ci-template.yml\n@@ -1 +1 @@\n-name: Old CI\n+name: New CI',
+      operation_type: 'modify',
+    });
+    expect(result.policy_decision.decision).toBe(ResponseAction.ApproveRequired);
+    expect(result.approval_request).toMatchObject({
+      action_title: 'Approve workspace mutation (modify)',
+      impact_scope: 'src\\templates\\ci-template.yml, .github\\workflows\\ci-template.yml',
+    });
+    expect(result.risk_event.summary).toContain('modify');
+    expect(result.risk_event.explanation).toContain('Workspace operation type=modify.');
+  });
+
   it('surfaces delete apply_patch semantics conservatively for mixed patch actions', () => {
     const result = buildOpenClawEvaluationArtifacts({
       clock: fixedClock,
