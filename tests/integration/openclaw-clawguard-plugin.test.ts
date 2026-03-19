@@ -1719,6 +1719,38 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     );
   });
 
+  it('canonicalizes createdPaths and file_paths aliases into workspace closure detail', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          createdPaths: [
+            'src\\generated\\feature-flags.ts',
+            'src\\generated\\feature-switches.ts',
+          ],
+          file_paths: ['src\\generated\\feature-flags.ts', 'src\\generated\\feature-switches.ts'],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=insert via created; created=src\\generated\\feature-flags.ts, src\\generated\\feature-switches.ts; paths=src\\generated\\feature-flags.ts, src\\generated\\feature-switches.ts',
+    );
+  });
+
   it('canonicalizes removed aliases into workspace delete closure detail', () => {
     const state = createClawGuardState();
     const beforeHandler = createBeforeToolCallHandler(state);
@@ -1775,6 +1807,39 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 
     expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
       'Result detail: operation type=renamed; tool result status=completed; workspace result state=rename-like via operation_type; renamed=src\\templates\\legacy-banner.ts -> src\\templates\\hero-banner.ts',
+    );
+  });
+
+  it('canonicalizes moved aliases into workspace rename-like closure detail', () => {
+    const state = createClawGuardState();
+    const beforeHandler = createBeforeToolCallHandler(state);
+    const persistHandler = createToolResultPersistHandler(state);
+    const { event, context } = createWorkspaceWriteEvent({
+      path: 'src\\generated\\feature-flags.ts',
+      content: 'export const featureFlag = true;\n',
+    });
+
+    expect(beforeHandler(event, context)).toBeUndefined();
+
+    persistHandler(
+      {
+        ...event,
+        result: {
+          status: 'completed',
+          persisted: true,
+          moved: [
+            {
+              sourcePath: 'src\\templates\\ops-template.yml',
+              targetPath: '.github\\workflows\\ops-template.yml',
+            },
+          ],
+        },
+      },
+      context,
+    );
+
+    expect(getLatestAuditByKind(state, 'allowed')?.detail).toContain(
+      'Result detail: tool result status=completed; workspace result state=rename-like via renamed; renamed=src\\templates\\ops-template.yml -> .github\\workflows\\ops-template.yml',
     );
   });
 

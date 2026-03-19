@@ -718,6 +718,19 @@ export function summarizeStructuredToolResult(result: unknown): string | undefin
     ...summarizeStructuredResultValues(record.changedPaths),
     ...summarizeStructuredResultValues(record.changed_paths),
     ...summarizeStructuredResultValues(record.filePaths),
+    ...summarizeStructuredResultValues(record.file_paths),
+    ...summarizeStructuredResultValues(record.createdPaths),
+    ...summarizeStructuredResultValues(record.created_paths),
+    ...summarizeStructuredResultValues(record.addedPaths),
+    ...summarizeStructuredResultValues(record.added_paths),
+    ...summarizeStructuredResultValues(record.updatedPaths),
+    ...summarizeStructuredResultValues(record.updated_paths),
+    ...summarizeStructuredResultValues(record.modifiedPaths),
+    ...summarizeStructuredResultValues(record.modified_paths),
+    ...summarizeStructuredResultValues(record.deletedPaths),
+    ...summarizeStructuredResultValues(record.deleted_paths),
+    ...summarizeStructuredResultValues(record.removedPaths),
+    ...summarizeStructuredResultValues(record.removed_paths),
   ].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
 
   if (summary) {
@@ -1042,7 +1055,11 @@ function summarizeStructuredResultField(
 ): string | undefined {
   const normalizedValues =
     fieldName === 'renamed'
-      ? summarizeStructuredFieldAliasValues(record, [fieldName], summarizeStructuredRenameFieldValue)
+      ? summarizeStructuredFieldAliasValues(
+          record,
+          StructuredRenameFieldAliases,
+          summarizeStructuredRenameFieldValue,
+        )
       : summarizeStructuredFieldAliasValues(
           record,
           StructuredResultFieldAliases[fieldName],
@@ -1056,10 +1073,19 @@ function summarizeStructuredResultField(
 }
 
 const StructuredResultFieldAliases = {
-  created: ['created', 'added'],
-  updated: ['updated', 'modified'],
-  deleted: ['deleted', 'removed'],
+  created: ['created', 'added', 'createdPaths', 'created_paths', 'addedPaths', 'added_paths'],
+  updated: ['updated', 'modified', 'updatedPaths', 'updated_paths', 'modifiedPaths', 'modified_paths'],
+  deleted: ['deleted', 'removed', 'deletedPaths', 'deleted_paths', 'removedPaths', 'removed_paths'],
 } as const satisfies Record<'created' | 'updated' | 'deleted', readonly string[]>;
+
+const StructuredRenameFieldAliases = [
+  'renamed',
+  'moved',
+  'renamedPaths',
+  'renamed_paths',
+  'movedPaths',
+  'moved_paths',
+] as const;
 
 function summarizeStructuredResultFieldValue(value: unknown): string | undefined {
   const normalizedValues = summarizeStructuredResultValues(value);
