@@ -104,6 +104,7 @@
 - 当前 `workspace mutation` 已开始携带共享 Core 的 `workspace_context.operation_type`：`edit` 已收紧到高置信 identifier-family rename-like，`apply_patch` 已支持 Add / Delete / Modify / RenameLike，path-pair 场景也已能在高置信时补充 `rename-like`，低置信则保守回退 `modify`
 - 当前 release 文档工作已完成 first usable version 汇总草稿：external / internal release notes、announcement 与 acceptance checklist 均已落盘，可在真正对外发布前继续润色
 - 当前 **first usable version** 口径已固定为：本地路径优先安装 + 以 `/clawguard*` 为浏览器入口的五页 smoke（`/clawguard` → `/clawguard/checkup` → `/clawguard/approvals` → `/clawguard/audit` → `/clawguard/settings`）+ fake-only 的 `exec` / minimal outbound / `write` / `edit` / `apply_patch` workspace mutation 演示
+- 当前 `/clawguard` public shell 已对齐 OpenClaw Control UI 的浏览器 bootstrap 思路：无 token 时先显示连接页，支持手动粘贴 token 或一次性 `#token` 导入，并只把 token 保存在当前标签页 `sessionStorage`
 - 当前 **first usable version** 明确 **不包括**：registry publish、GA、真实危险执行、真实红包/转账、真实 outbound 验证、完整 outbound/workspace 覆盖、Control UI 左侧 `Security` 导航或 patched UI 集成
 
 ### first usable version 边界（当前对外口径）

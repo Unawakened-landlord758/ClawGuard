@@ -52,7 +52,7 @@ Restart OpenClaw after installing the tarball as well.
 After install and restart:
 
 1. Get the official tokenized dashboard URL with `openclaw dashboard --no-open`
-2. Open `http://127.0.0.1:18789/clawguard#token=<gateway-token>` directly, or take the official tokenized dashboard URL and replace its path with `/clawguard`
+2. Open bare `http://127.0.0.1:18789/clawguard` and paste the gateway token into the shell connect page, or take the official tokenized dashboard URL and replace its path with `/clawguard`
 3. Navigate to `/clawguard/checkup`
 4. Open `/clawguard/approvals`
 5. Open `/clawguard/audit`
@@ -83,13 +83,20 @@ ClawGuard now exposes a plugin-owned public shell at `/clawguard`:
 
 1. Get the official tokenized dashboard URL with `openclaw dashboard --no-open`
 2. Open that URL directly after replacing its path with `/clawguard`
-3. Or open `/clawguard#token=<gateway-token>` directly on the same origin
+3. Or open `/clawguard#token=<gateway-token>` directly on the same origin as a one-time bootstrap; the shell imports it into the current tab session and strips it from the URL
 
-The public shell reads the current tab token from the official tokenized dashboard flow and then loads the protected `/plugins/clawguard/*` pages behind the scenes. This keeps the plugin usable without patching OpenClaw core and without requiring a browser userscript.
+The public shell now mirrors OpenClaw Control UI bootstrap more closely:
+
+- bare `/clawguard` shows a connect page instead of a dead-end error
+- you can paste the gateway token directly into that page
+- `/clawguard#token=<gateway-token>` is treated as a one-time bootstrap import and then stripped from the URL
+- the token is kept in current-tab `sessionStorage`, not persisted to localStorage
+
+The shell reads the current tab token from the official tokenized dashboard flow or from the shell connect page and then loads the protected `/plugins/clawguard/*` pages behind the scenes. This keeps the plugin usable without patching OpenClaw core and without requiring a browser userscript.
 
 Within the shell, ClawGuard now rewrites protected page links and approval form actions back onto the `/clawguard*` surface. That keeps same-tab navigation on the public shell, while approval submits still proxy back to the protected approvals action using the current tab gateway token instead of exposing live approval mutations directly on the public route family.
 
-If you arrive at bare `/clawguard` from an already authenticated official dashboard tab, the shell now promotes the current tab gateway token into its own session-scoped shell token cache and continues to emit tokenized `/clawguard#token=...` links. This keeps copied links and new-tab shell links stable inside the same browser session without patching OpenClaw core.
+If you arrive at bare `/clawguard` from an already authenticated official dashboard tab, the shell promotes the current tab gateway token into its own session-scoped shell token cache. That keeps same-tab shell navigation working without patching OpenClaw core.
 
 
 ### Legacy companion userscript
@@ -121,7 +128,7 @@ Use this as the short operator script for public demo recordings or local walkth
 
 ### 1-minute demo order
 
-1. Open `/clawguard#token=<gateway-token>` and say this is an install demo only, unpublished, local-path-first plugin demo
+1. Open `/clawguard` and, if needed, show the shell connect page or one-time `#token` bootstrap; say this is an install demo only, unpublished, local-path-first plugin demo
 2. Point to the recommended install command and optional local tarball path
 3. Use the dashboard cards to point to `/clawguard/checkup`, `/clawguard/approvals`, `/clawguard/audit`, and `/clawguard/settings`
 4. Run one fake-only risky `exec` example and show the approval / audit path
@@ -184,5 +191,5 @@ Ask OpenClaw to perform a risky file change such as a suspicious `write`, `edit`
 - workspace mutation heuristics remain intentionally small and fake-only: they only add explainable checks for key config files, repo automation metadata, and obvious out-of-workspace writes
 - the built-in Control UI sidebar is still core-owned and hard-coded; there is no official plugin API to register a left-nav `Security` tab yet
 - direct browser navigation to `/plugins/clawguard/*` still returns `401 Unauthorized` without gateway auth headers
-- the supported no-core-patch browser path is the public shell at `/clawguard`, opened from the official tokenized dashboard URL or directly as `/clawguard#token=<gateway-token>`
+- the supported no-core-patch browser path is the public shell at `/clawguard`; it now aligns with OpenClaw's browser bootstrap by showing a connect page when no token is available and by treating `/clawguard#token=<gateway-token>` as one-time bootstrap only
 - any future `Security` entry in Control UI therefore likely means either a custom/patched Control UI build or a future upstream plugin-nav capability

@@ -3119,11 +3119,17 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(htmlResponse.body).toContain('clawguard.public-shell.gateway-token.v1');
     expect(htmlResponse.body).toContain("contentEl.querySelectorAll('a[href]')");
     expect(htmlResponse.body).toContain("contentEl.querySelectorAll('form[action]')");
+    expect(htmlResponse.body).toContain('Connect ClawGuard');
+    expect(htmlResponse.body).toContain('clawguard-shell-connect-form');
+    expect(htmlResponse.body).toContain('persistGatewaySessionToken');
+    expect(htmlResponse.body).toContain('sessionStorage.setItem(');
+    expect(htmlResponse.body).toContain('clearBootstrapHash');
     expect(htmlResponse.body).toContain('event.button !== 0');
     expect(htmlResponse.body).toContain("new FormData(form)");
     expect(htmlResponse.body).toContain('searchParams.append');
     expect(htmlResponse.body).toContain('const gatewaySessionToken = readGatewaySessionToken()');
     expect(htmlResponse.body).toContain("return cacheShellToken(gatewaySessionToken)");
+    expect(htmlResponse.body).toContain('shell 会像 OpenClaw dashboard 一样导入 token 后立刻把它从 URL 中去掉');
     expect(htmlResponse.body).not.toContain('window.__clawGuardCompanion');
   });
 
@@ -3170,6 +3176,25 @@ describe('OpenClaw ClawGuard plugin spike', () => {
 
     expect(response.statusCode).toBe(405);
     expect(response.body).toContain('Method not allowed.');
+  });
+
+  it('turns bare public-shell access into a connect page instead of a dead-end startup failure', () => {
+    const route = createPublicShellRoute();
+    const response = createMockResponse();
+
+    route(
+      {
+        method: 'GET',
+        url: '/clawguard',
+      } as never,
+      response as never,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Connect ClawGuard');
+    expect(response.body).toContain('Gateway token');
+    expect(response.body).toContain('token 只写入当前浏览器标签页的 sessionStorage');
+    expect(response.body).not.toContain('ClawGuard public shell could not start');
   });
 
   it('serves the dashboard-centered smoke path and exposes audit entries from the fake-only approval flow', () => {

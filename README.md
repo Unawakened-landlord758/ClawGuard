@@ -102,6 +102,7 @@ After install, restart OpenClaw, then use the plugin README operator runbook for
 
 - run `openclaw dashboard --no-open`
 - replace the official tokenized dashboard URL path with `/clawguard`
+- if bare `/clawguard` has no current-tab token yet, the public shell now shows a connect page aligned with OpenClaw Control UI bootstrap instead of failing closed
 - then move through:
   - `/clawguard`
   - `/clawguard/checkup`

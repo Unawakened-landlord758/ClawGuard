@@ -84,6 +84,7 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
 
 - 先运行 `openclaw dashboard --no-open`
 - 将官方 tokenized dashboard URL 的路径替换为 `/clawguard`
+- 如果裸开 `/clawguard` 时当前标签页还没有 token，public shell 现在会像 OpenClaw Control UI 一样先显示连接页，而不是直接失败
 - 然后按顺序进入：
   - `/clawguard`
   - `/clawguard/checkup`

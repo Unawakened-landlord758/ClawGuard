@@ -156,6 +156,7 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
         const settingsStorageKey = 'openclaw.control.settings.v1';
         const tokenSessionKeyPrefix = 'openclaw.control.token.v1:';
         const shellTokenStorageKey = 'clawguard.public-shell.gateway-token.v1';
+        const connectFormId = 'clawguard-shell-connect-form';
 
         function setStatus(message, isError = false) {
           if (!statusEl) return;
@@ -190,6 +191,11 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           } catch {
             return '';
           }
+        }
+
+        function inferDefaultGatewayUrl() {
+          const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+          return proto + '://' + location.host;
         }
 
         function readHashToken() {
@@ -237,6 +243,25 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           return token;
         }
 
+        function persistGatewaySessionToken(token) {
+          const normalized = typeof token === 'string' ? token.trim() : '';
+          if (!normalized) {
+            return '';
+          }
+
+          const gatewayUrl = readSettingsGatewayUrl() || inferDefaultGatewayUrl();
+          try {
+            sessionStorage.setItem(
+              tokenSessionKeyPrefix + normalizeGatewayTokenScope(gatewayUrl),
+              normalized,
+            );
+          } catch {
+            return normalized;
+          }
+
+          return normalized;
+        }
+
         function readCachedShellToken() {
           try {
             const token = sessionStorage.getItem(shellTokenStorageKey);
@@ -249,6 +274,7 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
         function readPreferredShellToken() {
           const hashToken = readHashToken();
           if (hashToken) {
+            persistGatewaySessionToken(hashToken);
             return cacheShellToken(hashToken);
           }
 
@@ -263,11 +289,6 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           }
 
           return '';
-        }
-
-        function readPreferredShellHash() {
-          const token = readPreferredShellToken();
-          return token ? '#token=' + encodeURIComponent(token) : '';
         }
 
         function readSessionToken() {
@@ -305,8 +326,45 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           return pathname + search + (hash || '');
         }
 
+        function clearBootstrapHash() {
+          if (!location.hash) {
+            return;
+          }
+          history.replaceState({}, '', location.pathname + location.search);
+        }
+
+        function renderConnectView(message) {
+          if (!contentEl) {
+            return;
+          }
+
+          const hint =
+            typeof message === 'string' && message.trim()
+              ? message.trim()
+              : '输入当前 gateway token，或先从 openclaw dashboard --no-open 打开的官方 dashboard 进入，再切到 /clawguard。';
+
+          contentEl.innerHTML =
+            '<h2>Connect ClawGuard</h2>' +
+            '<p>ClawGuard 对齐 OpenClaw Control UI 的浏览器连接方式：先进入同源壳页面，再把 gateway token 导入当前标签页 sessionStorage，然后在后台加载受保护的插件页面。</p>' +
+            '<p><strong>你可以直接在这里粘贴 token。</strong> token 只写入当前浏览器标签页的 sessionStorage，不会写入 localStorage。</p>' +
+            '<form id="' +
+            connectFormId +
+            '">' +
+            '<label for="clawguard-shell-token">Gateway token</label><br />' +
+            '<input id="clawguard-shell-token" name="token" type="password" autocomplete="off" spellcheck="false" required style="margin-top:0.5rem;width:100%;max-width:32rem;padding:0.6rem 0.75rem;" />' +
+            '<div style="margin-top:0.75rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">' +
+            '<button type="submit">Connect</button>' +
+            '<span class="shell-muted">' +
+            hint +
+            '</span>' +
+            '</div>' +
+            '</form>' +
+            '<p class="shell-muted" style="margin-top:1rem;">也可以直接打开 <code>' +
+            boot.publicBasePath +
+            '#token=&lt;gateway-token&gt;</code>；shell 会像 OpenClaw dashboard 一样导入 token 后立刻把它从 URL 中去掉。</p>';
+        }
+
         function updateNav(activeSurfaceId) {
-          const preferredHash = readPreferredShellHash();
           document.querySelectorAll('[data-surface-link]').forEach((node) => {
             const targetId = node.getAttribute('data-surface-link');
             if (!targetId) {
@@ -324,7 +382,7 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
             if (node.tagName !== 'A') {
               const surface = boot.surfaces.find((entry) => entry.id === targetId);
               const anchor = document.createElement('a');
-              anchor.href = buildPublicShellUrl(surface ? surface.publicPath : boot.publicBasePath, '', preferredHash);
+              anchor.href = buildPublicShellUrl(surface ? surface.publicPath : boot.publicBasePath, '', '');
               anchor.setAttribute('data-surface-link', targetId);
               anchor.textContent = node.textContent || targetId;
               node.replaceWith(anchor);
@@ -334,7 +392,7 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
             const surface = boot.surfaces.find((entry) => entry.id === targetId);
             node.setAttribute(
               'href',
-              buildPublicShellUrl(surface ? surface.publicPath : boot.publicBasePath, '', preferredHash),
+              buildPublicShellUrl(surface ? surface.publicPath : boot.publicBasePath, '', ''),
             );
           });
         }
@@ -343,8 +401,6 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           if (!contentEl) {
             return;
           }
-
-          const preferredHash = readPreferredShellHash();
 
           contentEl.querySelectorAll('a[href]').forEach((node) => {
             if (!(node instanceof HTMLAnchorElement)) {
@@ -361,7 +417,7 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
             }
             node.setAttribute(
               'href',
-              buildPublicShellUrl(publicPath, targetUrl.search, targetUrl.hash || preferredHash),
+              buildPublicShellUrl(publicPath, targetUrl.search, ''),
             );
           });
 
@@ -380,7 +436,7 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
             }
             node.setAttribute(
               'action',
-              buildPublicShellUrl(publicPath, targetUrl.search, targetUrl.hash || preferredHash),
+              buildPublicShellUrl(publicPath, targetUrl.search, ''),
             );
           });
         }
@@ -388,9 +444,11 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
         async function fetchProtected(url, init) {
           const token = readSessionToken();
           if (!token) {
-            throw new Error(
-              '当前标签页没有可用的 gateway token。请直接打开 /clawguard#token=<gateway-token>，或先使用 openclaw dashboard --no-open 打开官方 tokenized dashboard URL，再把路径改成 /clawguard。',
+            renderConnectView(
+              '当前标签页没有可用的 gateway token。请直接粘贴 token，或先使用 openclaw dashboard --no-open 打开官方 tokenized dashboard URL，再把路径改成 /clawguard。',
             );
+            setStatus('ClawGuard 还没有连接到当前 gateway。先输入 token，或从官方 dashboard tab 进入。', true);
+            return null;
           }
 
           const headers = new Headers((init && init.headers) || undefined);
@@ -425,6 +483,9 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
 
           setStatus('Loading ' + activeSurface.label + '...');
           const response = await fetchProtected(protectedUrl.toString(), options);
+          if (!response) {
+            return;
+          }
           const html = await response.text();
           renderFetchedHtml(html, response.url || protectedUrl.toString());
 
@@ -432,7 +493,6 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           const finalSurface = resolveSurfaceByProtectedPath(finalProtectedUrl.pathname);
           const finalPublicUrl = new URL(finalSurface.publicPath, location.origin);
           finalPublicUrl.search = finalProtectedUrl.search;
-          finalPublicUrl.hash = finalProtectedUrl.hash || targetUrl.hash || readPreferredShellHash();
           if (location.pathname + location.search + location.hash !== finalPublicUrl.pathname + finalPublicUrl.search + finalPublicUrl.hash) {
             history.replaceState({ surfaceId: finalSurface.id }, '', finalPublicUrl.pathname + finalPublicUrl.search + finalPublicUrl.hash);
           }
@@ -489,13 +549,12 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
             return;
           }
           event.preventDefault();
-          const preferredHash = nextUrl.hash || readPreferredShellHash();
           const publicUrl = isProtectedSurface
             ? (() => {
                 const mapped = resolveSurfaceByProtectedPath(nextUrl.pathname);
-                return buildPublicShellUrl(mapped.publicPath, nextUrl.search, preferredHash);
+                return buildPublicShellUrl(mapped.publicPath, nextUrl.search, '');
               })()
-            : buildPublicShellUrl(nextUrl.pathname, nextUrl.search, preferredHash);
+            : buildPublicShellUrl(nextUrl.pathname, nextUrl.search, '');
           history.pushState({ surfaceId: resolveSurfaceByPublicPath(new URL(publicUrl, location.origin).pathname).id }, '', publicUrl);
           loadSurfaceByPublicUrl(publicUrl).catch((error) => {
             setStatus(error instanceof Error ? error.message : String(error), true);
@@ -517,11 +576,32 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           const publicApprovalsUrl = buildPublicShellUrl(
             resolveSurfaceByProtectedPath(actionUrl.pathname).publicPath,
             actionUrl.search,
-            actionUrl.hash || readPreferredShellHash(),
+            '',
           );
           const submission = buildPublicFormSubmission(form, publicApprovalsUrl || boot.publicBasePath);
           history.replaceState({ surfaceId: 'approvals' }, '', submission.publicUrl);
           loadSurfaceByPublicUrl(submission.publicUrl, submission.requestInit).catch((error) => {
+            setStatus(error instanceof Error ? error.message : String(error), true);
+          });
+        });
+
+        document.addEventListener('submit', (event) => {
+          const form = event.target instanceof HTMLFormElement ? event.target : null;
+          if (!form || form.id !== connectFormId) {
+            return;
+          }
+          event.preventDefault();
+          const formData = new FormData(form);
+          const token = String(formData.get('token') || '').trim();
+          if (!token) {
+            setStatus('请输入 gateway token。', true);
+            return;
+          }
+          persistGatewaySessionToken(token);
+          cacheShellToken(token);
+          clearBootstrapHash();
+          setStatus('Gateway token 已导入当前标签页，正在加载 ClawGuard...');
+          loadSurfaceByPublicUrl(location.pathname + location.search).catch((error) => {
             setStatus(error instanceof Error ? error.message : String(error), true);
           });
         });
@@ -532,16 +612,16 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           });
         });
 
-        loadSurfaceByPublicUrl(location.pathname + location.search + location.hash).catch((error) => {
+        if (readHashToken()) {
+          clearBootstrapHash();
+        }
+
+        loadSurfaceByPublicUrl(location.pathname + location.search).catch((error) => {
           setStatus(error instanceof Error ? error.message : String(error), true);
           if (contentEl) {
-            contentEl.innerHTML =
-              '<h2>ClawGuard public shell could not start</h2>' +
-              '<p>Open <code>' +
-              boot.publicBasePath +
-              '#token=&lt;gateway-token&gt;</code> directly, or start from the official <code>openclaw dashboard --no-open</code> URL and replace the path with <code>' +
-              boot.publicBasePath +
-              '</code>.</p>';
+            renderConnectView(
+              '如果你是首次从浏览器访问这里，请先粘贴 token，或者先打开官方 dashboard 再切到 /clawguard。',
+            );
           }
         });
       })();
