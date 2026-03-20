@@ -45,11 +45,8 @@
 - **最小 outbound 覆盖**
 - **最小 workspace mutation 覆盖（当前统一指 `write` / `edit` / `apply_patch` 这组动作）**
 - **插件自带的 dashboard / checkup / approvals / audit / settings 页面**：
-  - `/plugins/clawguard/dashboard`
-  - `/plugins/clawguard/checkup`
-  - `/plugins/clawguard/approvals`
-  - `/plugins/clawguard/audit`
-  - `/plugins/clawguard/settings`
+  - 浏览器用户入口走 `/clawguard*`
+  - 受保护 backing routes 保留在 `/plugins/clawguard/*`
 
 当前仓库状态也要说清楚：
 
@@ -80,16 +77,19 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
 
 - 当前只是 **install demo**
 - **没有发布到任何 registry**
-- `@clawguard/openclaw-clawguard` 目前只是 **元数据 / 未来兼容命名占位**
+- `@clawguard/clawguard` 目前只是 **元数据，且仍未发布**
 - 这里**不代表** npm publish、GA 或正式 release 已经存在
 
 安装后请重启 OpenClaw，再按插件 README 里的 operator runbook 走 smoke path、1 分钟 demo 顺序和 3 分钟 demo 顺序。当前 smoke path 是：
 
-- `/plugins/clawguard/dashboard`
-- `/plugins/clawguard/checkup`
-- `/plugins/clawguard/approvals`
-- `/plugins/clawguard/audit`
-- `/plugins/clawguard/settings`
+- 先运行 `openclaw dashboard --no-open`
+- 将官方 tokenized dashboard URL 的路径替换为 `/clawguard`
+- 然后按顺序进入：
+  - `/clawguard`
+  - `/clawguard/checkup`
+  - `/clawguard/approvals`
+  - `/clawguard/audit`
+  - `/clawguard/settings`
 
 ## Demo 场景
 
@@ -124,9 +124,9 @@ openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
 - **不是正式 release**
 - **不能当成 GA 或完整产品发布来理解**
 - **outbound 覆盖仍然是最小版本**
-- **宿主级 direct outbound 目前不能进入 pending approval loop，所以 `message_sending` 在命中 `approve_required` 或 `block` 时都会走 hard block；`message_sent` 只负责回收那些已经真正发出宿主的允许/失败结果；工具级 `message` / `sessions_send` 审批链仍单独保留，但这仍只是最小 fake-only review point，不是完整 outbound 生命周期**
+- **宿主级 outbound 当前只有 `message_sending` hard block，并通过 `message_sent` 回收允许/失败结果；工具级 `message` / `sessions_send` 审批链与它并存，但这仍只是两处最小 fake-only review point，不是完整 outbound 生命周期**
 - **审批闭环当前仍然是 pending-action + allow-once retry 的 demo 形态**
-- **OpenClaw 现有内置 Control UI 里依然没有 stock 的 `Security` 左侧标签；Control UI 内嵌、安全左侧导航、patched UI 等工作明确不在这个 first usable version 范围内；当前仍以直达 `/plugins/clawguard/*` 路由为准**
+- **OpenClaw 现有内置 Control UI 里依然没有 stock 的 `Security` 左侧标签；Control UI 内嵌、安全左侧导航、patched UI 等工作明确不在这个 first usable version 范围内；当前浏览器入口以 `/clawguard*` public shell 为准，而 `/plugins/clawguard/*` 只是受保护 backing routes**
 - **不应把当前 demo 理解成真实危险执行、真实红包 / 转账执行，或正式发布级验证**
 
 ## 文档地图

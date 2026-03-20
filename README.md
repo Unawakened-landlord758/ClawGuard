@@ -56,18 +56,15 @@ Today that demo covers:
 - **risky `exec`**
 - **minimal outbound coverage**
 - **minimal workspace mutation coverage for `write` / `edit` / `apply_patch` actions**
-- **plugin-hosted dashboard, checkup, approvals, audit, and settings pages** at:
-  - `/plugins/clawguard/dashboard`
-   - `/plugins/clawguard/checkup`
-  - `/plugins/clawguard/approvals`
-  - `/plugins/clawguard/audit`
-  - `/plugins/clawguard/settings`
+- **plugin-hosted dashboard, checkup, approvals, audit, and settings pages** with:
+  - browser-facing entry paths on `/clawguard*`
+  - protected backing routes on `/plugins/clawguard/*`
 
 Current Control UI posture:
 
 - the plugin can already expose its own HTTP surfaces under `/plugins/clawguard/*`,
 - but the current OpenClaw plugin API does **not** expose a formal way to register a left-nav tab such as **Security** inside the built-in Control UI,
-- so the current demo should be understood as **plugin-owned pages reachable from direct URLs**, not a first-class embedded dashboard tab. Any future embedded Control UI work would be a separate track requiring either a patched UI or upstream plugin-nav support that does not exist today.
+- so the current demo should be understood as **plugin-owned pages entered through the public `/clawguard*` shell URLs**, not a first-class embedded dashboard tab. Any future embedded Control UI work would be a separate track requiring either a patched UI or upstream plugin-nav support that does not exist today.
 
 Current repo status:
 
@@ -98,16 +95,19 @@ Important posture:
 
 - this is an **install demo only**,
 - it is **not published to a registry**,
-- `@clawguard/openclaw-clawguard` is currently **metadata / future-compatibility naming only**,
+- `@clawguard/clawguard` is currently **metadata only and still unpublished**,
 - and this README does **not** imply npm publish, GA, or a formal release.
 
 After install, restart OpenClaw, then use the plugin README operator runbook for the smoke path, 1-minute demo order, and 3-minute demo order. The current smoke path is:
 
-- `/plugins/clawguard/dashboard`
-- `/plugins/clawguard/checkup`
-- `/plugins/clawguard/approvals`
-- `/plugins/clawguard/audit`
-- `/plugins/clawguard/settings`
+- run `openclaw dashboard --no-open`
+- replace the official tokenized dashboard URL path with `/clawguard`
+- then move through:
+  - `/clawguard`
+  - `/clawguard/checkup`
+  - `/clawguard/approvals`
+  - `/clawguard/audit`
+  - `/clawguard/settings`
 
 ## Demo scenarios
 
@@ -142,11 +142,11 @@ Please read this repo with the current scope in mind:
 - **not a formal release**
 - **not presented as GA or a complete product**
 - **outbound coverage is still minimal**
-- **host-level direct outbound cannot enter the pending approval loop, so `message_sending` stays on the hard-block path for both `approve_required` and `block` cases; `message_sent` only closes sends that were actually allowed to leave the host, while tool-level approvals stay on `message` / `sessions_send`; these are still minimal fake-only review points, not full outbound lifecycle coverage**
+- **host-level outbound keeps hard blocks on `message_sending` and closes allowed / failed delivery on `message_sent`, while tool-level approvals stay on `message` / `sessions_send`; these are still two minimal fake-only review points, not full outbound lifecycle coverage**
 - **the approval loop is still a pending-action + allow-once-retry demo flow**
 - **the built-in Control UI sidebar is currently core-owned and hard-coded; there is no official plugin nav registration API for a `Security` tab yet**
-- **current UI integration therefore relies on direct plugin routes such as `/plugins/clawguard/dashboard`, `/plugins/clawguard/checkup`, `/plugins/clawguard/approvals`, `/plugins/clawguard/audit`, and `/plugins/clawguard/settings`**
-- **embedded Control UI work is explicitly out of scope for this first usable version; the current dashboard is already plugin-owned at `/plugins/clawguard/dashboard`, while any future embedded option would still require either a custom/patched Control UI nav item or an upstream OpenClaw plugin-nav API that does not exist today**
+- **current browser entry relies on the public shell at `/clawguard*`, while the protected `/plugins/clawguard/*` routes remain implementation backing routes**
+- **embedded Control UI work is explicitly out of scope for this first usable version; any future embedded option would still require either a custom/patched Control UI nav item or an upstream OpenClaw plugin-nav API that does not exist today**
 - **the demo should not be read as real dangerous execution, real transfer / red-packet execution, or full release-grade validation**
 
 ## Docs map
