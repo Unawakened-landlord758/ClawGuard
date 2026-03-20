@@ -187,6 +187,30 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
           return token ? token.trim() : '';
         }
 
+        function readGatewaySessionToken() {
+          const preferredGatewayUrl = readSettingsGatewayUrl();
+          if (preferredGatewayUrl) {
+            const preferredKey = tokenSessionKeyPrefix + normalizeGatewayTokenScope(preferredGatewayUrl);
+            const preferredToken = sessionStorage.getItem(preferredKey);
+            if (preferredToken && preferredToken.trim()) {
+              return preferredToken.trim();
+            }
+          }
+
+          for (let index = 0; index < sessionStorage.length; index += 1) {
+            const key = sessionStorage.key(index);
+            if (!key || !key.startsWith(tokenSessionKeyPrefix)) {
+              continue;
+            }
+            const token = sessionStorage.getItem(key);
+            if (token && token.trim()) {
+              return token.trim();
+            }
+          }
+
+          return '';
+        }
+
         function cacheShellToken(token) {
           if (!token) {
             return '';
@@ -216,7 +240,17 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
             return cacheShellToken(hashToken);
           }
 
-          return readCachedShellToken();
+          const cachedShellToken = readCachedShellToken();
+          if (cachedShellToken) {
+            return cachedShellToken;
+          }
+
+          const gatewaySessionToken = readGatewaySessionToken();
+          if (gatewaySessionToken) {
+            return cacheShellToken(gatewaySessionToken);
+          }
+
+          return '';
         }
 
         function readPreferredShellHash() {
@@ -225,26 +259,6 @@ function renderPublicShellPage(surface: PublicSurfaceDefinition): string {
         }
 
         function readSessionToken() {
-          const preferredGatewayUrl = readSettingsGatewayUrl();
-          if (preferredGatewayUrl) {
-            const preferredKey = tokenSessionKeyPrefix + normalizeGatewayTokenScope(preferredGatewayUrl);
-            const preferredToken = sessionStorage.getItem(preferredKey);
-            if (preferredToken && preferredToken.trim()) {
-              return preferredToken.trim();
-            }
-          }
-
-          for (let index = 0; index < sessionStorage.length; index += 1) {
-            const key = sessionStorage.key(index);
-            if (!key || !key.startsWith(tokenSessionKeyPrefix)) {
-              continue;
-            }
-            const token = sessionStorage.getItem(key);
-            if (token && token.trim()) {
-              return token.trim();
-            }
-          }
-
           const preferredShellToken = readPreferredShellToken();
           if (preferredShellToken) {
             return preferredShellToken;

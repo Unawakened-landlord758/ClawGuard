@@ -3122,6 +3122,8 @@ describe('OpenClaw ClawGuard plugin spike', () => {
     expect(htmlResponse.body).toContain('event.button !== 0');
     expect(htmlResponse.body).toContain("new FormData(form)");
     expect(htmlResponse.body).toContain('searchParams.append');
+    expect(htmlResponse.body).toContain('const gatewaySessionToken = readGatewaySessionToken()');
+    expect(htmlResponse.body).toContain("return cacheShellToken(gatewaySessionToken)");
     expect(htmlResponse.body).not.toContain('window.__clawGuardCompanion');
   });
 

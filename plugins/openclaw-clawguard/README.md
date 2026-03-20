@@ -89,6 +89,8 @@ The public shell reads the current tab token from the official tokenized dashboa
 
 Within the shell, ClawGuard now rewrites protected page links and approval form actions back onto the `/clawguard*` surface. That means same-tab navigation stays on the public shell, and tokenized `/clawguard#token=...` entry URLs remain usable across the shell flow instead of collapsing back to raw `/plugins/clawguard/*` links.
 
+If you arrive at bare `/clawguard` from an already authenticated official dashboard tab, the shell now promotes the current tab gateway token into its own session-scoped shell token cache and continues to emit tokenized `/clawguard#token=...` links. This keeps copied links and new-tab shell links stable inside the same browser session without patching OpenClaw core.
+
 ### Legacy companion userscript
 
 The companion userscript remains in the repo as a development fallback, but it is no longer the primary user entry path:
